@@ -1,12 +1,11 @@
 package com.junha.interview.controller;
 
 import com.junha.interview.common.ApiResponse;
+import com.junha.interview.dto.subscription.SubscribeRequest;
+import com.junha.interview.dto.subscription.UnsubscribeRequest;
 import com.junha.interview.service.SubscriptionService;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import lombok.Setter;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 
@@ -18,13 +17,13 @@ public class SubscriptionController {
     private final SubscriptionService subscriptionService;
 
     @PostMapping("/subscribe")
-    public ApiResponse<Void> subscribe(@RequestBody SubscribeRequest request) {
+    public ApiResponse<Void> subscribe(@RequestBody @Valid SubscribeRequest request) {
         subscriptionService.subscribe(request.getEmail(), request.getCategory());
         return ApiResponse.success(null);
     }
 
     @PostMapping("/unsubscribe")
-    public ApiResponse<Void> unsubscribePost(@RequestBody UnsubscribeRequest request) {
+    public ApiResponse<Void> unsubscribePost(@RequestBody @Valid UnsubscribeRequest request) {
         subscriptionService.unsubscribe(request.getEmail());
         return ApiResponse.success(null);
     }
@@ -74,28 +73,5 @@ public class SubscriptionController {
                 .replace(">", "&gt;")
                 .replace("\"", "&quot;")
                 .replace("'", "&#x27;");
-    }
-
-
-    @Getter
-    @Setter
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class SubscribeRequest {
-        private String email;
-        private String category;
-
-        public SubscribeRequest(String email) {
-            this.email = email;
-            this.category = "ALL";
-        }
-    }
-
-    @Getter
-    @Setter
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class UnsubscribeRequest {
-        private String email;
     }
 }

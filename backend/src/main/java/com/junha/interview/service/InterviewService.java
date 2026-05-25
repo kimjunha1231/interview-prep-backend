@@ -30,16 +30,6 @@ public class InterviewService {
     private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
-    public InterviewSession startSession(Long memberId, String category, String subject, int count) {
-        return startSession(memberId, category, subject, count, null);
-    }
-
-    @Transactional
-    public InterviewSession startSession(Long memberId, String category, String subject, int count, String portfolioText) {
-        return startSession(memberId, category, subject, null, count, portfolioText);
-    }
-
-    @Transactional
     public InterviewSession startSession(Long memberId, String category, String subject, List<String> subjects, int count, String portfolioText) {
         Member member = null;
         if (memberId != null) {

@@ -9,7 +9,10 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Entity
-@Table(name = "interview_session")
+@Table(
+    name = "interview_session",
+    indexes = @Index(name = "idx_session_access_key", columnList = "access_key")
+)
 @Getter
 @Setter
 @NoArgsConstructor

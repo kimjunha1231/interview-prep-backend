@@ -1,6 +1,8 @@
 package com.junha.interview.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.junha.interview.dto.subscription.SubscribeRequest;
+import com.junha.interview.dto.subscription.UnsubscribeRequest;
 import com.junha.interview.service.SubscriptionService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -32,7 +34,7 @@ public class SubscriptionControllerTest {
     @DisplayName("이메일 구독 신청 - 성공")
     void subscribeSuccess() throws Exception {
         String email = "test@example.com";
-        SubscriptionController.SubscribeRequest request = new SubscriptionController.SubscribeRequest(email);
+        SubscribeRequest request = new SubscribeRequest(email);
 
         mockMvc.perform(post("/api/subscriptions/subscribe")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -47,7 +49,7 @@ public class SubscriptionControllerTest {
     void subscribeWithCategorySuccess() throws Exception {
         String email = "test@example.com";
         String category = "FE";
-        SubscriptionController.SubscribeRequest request = new SubscriptionController.SubscribeRequest(email, category);
+        SubscribeRequest request = new SubscribeRequest(email, category);
 
         mockMvc.perform(post("/api/subscriptions/subscribe")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -61,7 +63,7 @@ public class SubscriptionControllerTest {
     @DisplayName("이메일 구독 해제 (POST) - 성공")
     void unsubscribePostSuccess() throws Exception {
         String email = "test@example.com";
-        SubscriptionController.UnsubscribeRequest request = new SubscriptionController.UnsubscribeRequest(email);
+        UnsubscribeRequest request = new UnsubscribeRequest(email);
 
         mockMvc.perform(post("/api/subscriptions/unsubscribe")
                         .contentType(MediaType.APPLICATION_JSON)

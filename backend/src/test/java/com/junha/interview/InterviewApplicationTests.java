@@ -57,6 +57,7 @@ class InterviewApplicationTests {
 				.expectBody()
 				.jsonPath("$.success").isEqualTo(true)
 				.jsonPath("$.data.id").exists()
+				.jsonPath("$.data.accessKey").exists()
 				.jsonPath("$.data.questions").isArray()
 				.jsonPath("$.data.questions[0].id").exists()
 				.returnResult().getResponseBody();

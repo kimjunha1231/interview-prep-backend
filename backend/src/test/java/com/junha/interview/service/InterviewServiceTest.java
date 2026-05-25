@@ -60,7 +60,7 @@ public class InterviewServiceTest {
                 });
 
         // When
-        InterviewSession session = interviewService.startSession(null, "Frontend", "JavaScript", 1);
+        InterviewSession session = interviewService.startSession(null, "Frontend", "JavaScript", null, 1, null);
 
         // Then
         assertThat(session.getId()).isEqualTo(100L);
@@ -75,7 +75,7 @@ public class InterviewServiceTest {
         given(memberRepository.findById(999L)).willReturn(Optional.empty());
 
         // When & Then
-        assertThatThrownBy(() -> interviewService.startSession(999L, "Frontend", "JavaScript", 1))
+        assertThatThrownBy(() -> interviewService.startSession(999L, "Frontend", "JavaScript", null, 1, null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("존재하지 않는 회원입니다");
     }
@@ -84,11 +84,12 @@ public class InterviewServiceTest {
     @DisplayName("답변을 정상적으로 제출하고 가상 피드백 결과를 반환받으며 DB에 저장한다")
     void testSubmitAnswer() {
         // Given
+        String accessKey = "test-uuid-access-key";
         InterviewSession session = new InterviewSession(100L, null, LocalDateTime.now());
-        session.setAccessKey("test-uuid-key");
+        session.setAccessKey(accessKey);
         Question question = new Question(1L, "Frontend", "JavaScript", "What is closure?", "Closure is...");
 
-        given(sessionRepository.findByAccessKey("test-uuid-key")).willReturn(Optional.of(session));
+        given(sessionRepository.findByAccessKey(accessKey)).willReturn(Optional.of(session));
         given(questionRepository.findById(1L)).willReturn(Optional.of(question));
         given(geminiService.evaluateAnswer(any(), any(), any(), any(), any()))
                 .willReturn(new GeminiService.GeminiEvaluation(90, "Good feedback", "Tail question"));
@@ -100,7 +101,7 @@ public class InterviewServiceTest {
                 });
 
         // When
-        InterviewHistory history = interviewService.submitAnswer("test-uuid-key", 1L, "My Answer");
+        InterviewHistory history = interviewService.submitAnswer(accessKey, 1L, "My Answer");
 
         // Then
         assertThat(history.getId()).isEqualTo(200L);

@@ -3,20 +3,16 @@ package com.junha.interview.controller;
 import com.junha.interview.common.ApiResponse;
 import com.junha.interview.domain.InterviewHistory;
 import com.junha.interview.domain.InterviewSession;
-import com.junha.interview.domain.Question;
+import com.junha.interview.dto.interview.*;
 import com.junha.interview.service.InterviewService;
 import com.junha.interview.service.GroqService;
 import com.junha.interview.service.GeminiService;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import lombok.Setter;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
@@ -29,7 +25,7 @@ public class InterviewController {
     private final GeminiService geminiService;
 
     @PostMapping("/sessions")
-    public ApiResponse<InterviewSessionResponse> startSession(@RequestBody StartSessionRequest request) {
+    public ApiResponse<InterviewSessionResponse> startSession(@RequestBody @Valid StartSessionRequest request) {
         int count = request.getCount() != null ? request.getCount() : 3;
         InterviewSession session = interviewService.startSession(
                 request.getMemberId(),
@@ -45,7 +41,7 @@ public class InterviewController {
     @PostMapping("/sessions/{accessKey}/answers")
     public ApiResponse<InterviewHistoryResponse> submitAnswer(
         @PathVariable String accessKey,
-        @RequestBody SubmitAnswerRequest request
+        @RequestBody @Valid SubmitAnswerRequest request
     ) {
         InterviewHistory history = interviewService.submitAnswer(
                 accessKey,
@@ -90,109 +86,9 @@ public class InterviewController {
     @PostMapping("/sessions/{accessKey}/report/email")
     public ApiResponse<Void> sendEmailReport(
         @PathVariable String accessKey,
-        @RequestBody EmailReportRequest request
+        @RequestBody @Valid EmailReportRequest request
     ) {
         interviewService.sendReportEmail(accessKey, request.getEmail());
         return ApiResponse.success(null);
-    }
-
-    @Getter
-    @AllArgsConstructor
-    public static class TranscriptionResponse {
-        private String text;
-    }
-
-    @Getter
-    @Setter
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class StartSessionRequest {
-        private Long memberId;
-        private String category;
-        private String subject;
-        private List<String> subjects;
-        private Integer count;
-        private String portfolioText;
-    }
-
-    @Getter
-    @Setter
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class SubmitAnswerRequest {
-        private Long questionId;
-        private String userAnswer;
-    }
-
-    @Getter
-    @AllArgsConstructor
-    public static class QuestionResponse {
-        private Long id;
-        private String category;
-        private String subject;
-        private String title;
-        private String perfectAnswer;
-
-        public static QuestionResponse from(Question question) {
-            if (question == null) return null;
-            return new QuestionResponse(
-                    question.getId(),
-                    question.getCategory(),
-                    question.getSubject(),
-                    question.getTitle(),
-                    question.getPerfectAnswer()
-            );
-        }
-    }
-
-    @Getter
-    @AllArgsConstructor
-    public static class InterviewSessionResponse {
-        private Long id;
-        private String accessKey;
-        private Long memberId;
-        private LocalDateTime createdAt;
-        private List<QuestionResponse> questions;
-
-        public static InterviewSessionResponse from(InterviewSession session) {
-            if (session == null) return null;
-            List<QuestionResponse> questionDtos = session.getQuestions() == null ? null :
-                    session.getQuestions().stream().map(QuestionResponse::from).toList();
-            Long memberId = session.getMember() != null ? session.getMember().getId() : null;
-            return new InterviewSessionResponse(session.getId(), session.getAccessKey(), memberId, session.getCreatedAt(), questionDtos);
-        }
-    }
-
-    @Getter
-    @AllArgsConstructor
-    public static class InterviewHistoryResponse {
-        private Long id;
-        private Long sessionId;
-        private Long questionId;
-        private String userAnswer;
-        private int score;
-        private String feedback;
-        private String tailQuestion;
-
-        public static InterviewHistoryResponse from(InterviewHistory history) {
-            if (history == null) return null;
-            return new InterviewHistoryResponse(
-                    history.getId(),
-                    history.getSession().getId(),
-                    history.getQuestion().getId(),
-                    history.getUserAnswer(),
-                    history.getScore(),
-                    history.getFeedback(),
-                    history.getTailQuestion()
-            );
-        }
-    }
-
-    @Getter
-    @Setter
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class EmailReportRequest {
-        private String email;
     }
 }
