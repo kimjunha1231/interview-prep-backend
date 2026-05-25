@@ -1,0 +1,50 @@
+spring:
+  profiles:
+    active: local # 기본 활성화할 프로파일을 local로 지정
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:postgres}?sslmode=require
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:password}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${MAIL_USERNAME:placeholder_email@gmail.com}
+    password: ${MAIL_PASSWORD:placeholder_app_password}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html      # Swagger 접속 경로 지정
+    groups-order: DESC
+    operations-sorter: alpha
+  api-docs:
+    path: /api-docs             # OpenAPI Spec JSON을 조회할 경로
+
+ai:
+  gemini:
+    api-key: ${GEMINI_API_KEY:none}
+  groq:
+    api-key: ${GROQ_API_KEY:none}
+
+app:
+  frontend-url: "http://localhost:5173"
+  backend-url: "http://localhost:8080"
+
+
