@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: interview-prep-db
+    ports:
+      - '5432:5432'
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: postgres
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: always
+    networks:
+      - interview-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: interview-prep-backend
+    ports:
+      - '8080:8080'
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=postgres
+      - DB_USER=postgres
+      - DB_PASSWORD=password
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-none}
+      - GROQ_API_KEY=${GROQ_API_KEY:-none}
+      - MAIL_USERNAME=${MAIL_USERNAME:-none}
+      - MAIL_PASSWORD=${MAIL_PASSWORD:-none}
+    depends_on:
+      - postgres
+    restart: always
+    networks:
+      - interview-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: interview-prep-frontend
+    ports:
+      - '80:80'
+    depends_on:
+      - backend
+    restart: always
+    networks:
+      - interview-network
+
+volumes:
+  pgdata:
+    driver: local
+
+networks:
+  interview-network:
+    driver: bridge

@@ -1,0 +1,21 @@
+# Dependency directories
+node_modules/
+build/
+bin/
+out/
+.gradle/
+.idea/
+
+# Environment variables (Secrets)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Exclude frontend directory (handled in a separate repository)
+frontend/
