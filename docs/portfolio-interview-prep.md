@@ -680,7 +680,20 @@ sequenceDiagram
 *   **결과 (Result)**:
     - 불필요한 유휴 커넥션을 방지해 DB 서버에 가해지는 세션 부하를 축소하고, 예기치 않은 데이터베이스 연결 누수를 방지하여 DB 접속 회복 탄력성을 강화했습니다.
 
+### 📌 성과 47: HTTPS 프론트엔드(Vercel)와 HTTP 백엔드(AWS EC2) 간 Mixed Content 차단 및 CORS 연동 문제를 비용 $0로 우회 해결한 Edge Proxy(Vercel rewrites) 도입
+*   **상황 (Issue)**: Vercel(HTTPS) 환경에 배포된 프론트엔드에서 도메인 및 SSL 인증서가 부재한 AWS EC2 백엔드(HTTP IP:8080)로 직접 API 요청을 보낼 때, 브라우저의 Mixed Content 보안 규격(HTTPS -> HTTP 차단)과 CORS 제약으로 인해 백엔드 데이터 로딩이 전면 거부되는 심각한 통신 결함 발생.
+*   **대안 분석 & Trade-off**:
+    - *대안 A (도메인 구매 + Certbot/Nginx SSL 설정)*: 도메인을 별도로 구입하고 AWS Route53 연동 및 Certbot을 통해 HTTPS 인증서를 적용. ➔ 확실하지만 도메인 유지비가 상시 발생하고, AWS 프리티어 자원 한계에 Nginx 설정/인증서 갱신 백그라운드 오버헤드가 더해져 YAGNI 원칙 및 고정비 $0 원칙에 위배됨.
+    - *대안 B (Vercel Edge Proxy - Rewrites 활용)*: Vercel의 Edge Routing 기능을 활용하여 `vercel.json` 내에 `/api/:path*` 경로를 백엔드 IP 주소 `http://43.201.30.7:8080/api/:path*`로 백그라운드 프록시 매핑(Rewrites). ➔ 클라이언트는 동일 출처인 HTTPS를 통해 요청을 전송하므로 Mixed Content 정책이 원천 우회되며, 외부 도메인 구입 비용 없이 $0로 즉각적인 연동이 가능함. (최종 합리화 채택)
+*   **해결 방안 (Action)**:
+    1.  `vercel.json` 설정에 `rewrites` 규칙을 가동하여 브라우저에서 `/api`로 유도되는 모든 경로를 원격 EC2 백엔드로 Edge-level 프록시 중계하도록 구성.
+    2.  로컬 `api.ts`를 상대 경로 `/api` 호출로 단일화하여 환경 변수에 따른 주소 설정 종속성 완전 제거.
+    3.  백엔드 CORS 허용 Origin 설정을 Vercel의 HTTPS 프론트엔드 도메인(`https://interview-prep-handbook-1xr5.vercel.app`)으로 환경변수 주입 처리하여 요청 전달 시 CORS 통과 무결성 확보.
+*   **결과 (Result)**:
+    - 추가 도메인 구매 비용이나 Nginx SSL 발급 오버헤드 없이 **$0 비용**으로 클라이언트의 Mixed Content와 CORS 통신 장애를 완전히 해결하고 100% 정상 연동 성공.
+
 ---
+
 
 
 ## ❓ 4. 면접 대비 Q&A (Interview Q&A Prep)
@@ -1019,4 +1032,14 @@ sequenceDiagram
     2. *대안 B (Netty HttpClient 기반 공통 WebClient 등록 및 mutate() 복제 패턴)*: Netty의 `ChannelOption`과 `ReadTimeoutHandler`/`WriteTimeoutHandler`를 결합하여 커넥션 타임아웃(10초)과 읽기/응답 타임아웃(60초)을 갖는 단일 `WebClient` 빈을 생성합니다. 서비스 계층에서는 이 싱글톤 `WebClient`를 주입받은 후 `mutate()`를 통해 호스트 및 개별 헤더 속성만 부분 복제하여 동적으로 재사용합니다.
   - **최종 설계 합리화**:
     - 외부 장애 전파 차단과 메모리 효율을 극대화하기 위해 **타임아웃 튜닝 싱글톤 WebClient와 mutate() 재사용(대안 B)**을 채택했습니다. 이를 통해 타임아웃 제한 시간을 60초로 확실히 통제하여 외부 API 장애 시에도 스레드가 무제한 대기하는 현상을 완벽히 차단하고, 에러 처리(폴백) 로직이 기동하도록 장애 격리(Fault Isolation)를 달성했습니다. 또한, 공통 Netty 설정을 상속받는 단일 WebClient를 `mutate()`로 복제해 사용함으로써, 힙 메모리에 인스턴스가 지속적으로 할당 및 소멸하는 현상을 억제하여 1GB RAM의 극도로 제한된 서버 환경에서 GC로 인한 런타임 가용성 저하를 사전 예방했습니다.
+
+### **Q37. HTTPS 도메인에 배포된 프론트엔드와 SSL 인증서가 없는 HTTP 단독 IP로 구성된 백엔드 간의 Mixed Content 및 CORS 장애를 해결하기 위한 아키처적 설계 선택과 그에 대한 트레이드오프를 설명해 주세요.**
+- **모범 답변**:
+  - **문제 인식**: 브라우저 보안 정책에 따라, HTTPS 도메인(예: Vercel 배포망)에서 안전하지 않은 HTTP IP 주소(예: AWS EC2 단독 IP)로 직접 API 요청을 보낼 때 `Mixed Content` 에러가 발생해 웹 애플리케이션의 모든 네트워크 통신이 즉시 중단됩니다. 이를 해소하기 위해 가장 일반적인 도메인 구매 및 Let's Encrypt SSL 설정 방식을 취할 수 있으나, 프로젝트의 핵심 기조인 **'고정 비용 $0/month'**와 **'최소한의 자원을 유지하는 간결성(YAGNI)'**을 달성하기 위한 대안이 절실했습니다.
+  - **대안 분석 및 Trade-off**:
+    1. *대안 1 (Route53 + Nginx SSL 구축)*: 도메인을 직접 구매하여 EC2 IP와 매핑한 뒤 Nginx 및 Certbot을 세팅하는 방법입니다. 이식성이 높고 전통적이지만 매달 상시 도메인 구입 유지비가 발생하며, 1GB RAM의 t3.micro 서버 내에 Nginx 프록시와 Certbot 갱신 프로세스 등이 추가되는 리소스 오버헤드가 단점입니다.
+    2. *대안 2 (Vercel Edge Server Proxy - Rewrites 활용)*: Vercel의 Edge Routing 설정을 통해 프론트엔드 클라이언트가 상대 경로(`/api`)로 요청을 보내게 하고, Vercel Edge Server 단에서 백그라운드로 EC2 HTTP 서버로 통신을 중계하는 방식입니다. 브라우저 입장에서는 동일한 HTTPS 오리진과 통신하는 것이 되므로 Mixed Content 제약이 원천적으로 우회되며, 비용이 전혀 들지 않습니다. 단, Vercel 플랫폼에 배포 인프라가 종속되는 트레이드오프가 존재합니다.
+  - **최종 설계 합리화**:
+    - 개발 단계 및 1인 운영 수준의 토이 프로젝트 환경에서는 플랫폼 종속성 우려보다 고정 비용 절감과 서버의 리소스 보호가 최우선 순위라고 판단하여 **Vercel Edge Proxy(Rewrites) 기법을 최종 채택**하였습니다. 프론트엔드 레포지토리에 `vercel.json`을 탑재하여 백엔드 IP 주소를 리다이렉션함으로써, 추가 자원 낭비나 수동 Nginx 세팅 없이 즉각적으로 Mixed Content 차단 현상을 안정적으로 우회 돌파하였습니다.
+
 
