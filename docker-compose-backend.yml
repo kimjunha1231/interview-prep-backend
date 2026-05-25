@@ -2,9 +2,7 @@ version: '3.8'
 
 services:
   backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    image: ghcr.io/kimjunha1231/interview-prep-backend:latest
     container_name: interview-prep-backend
     ports:
       - '8080:8080'

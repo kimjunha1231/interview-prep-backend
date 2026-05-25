@@ -692,6 +692,32 @@ sequenceDiagram
 *   **결과 (Result)**:
     - 추가 도메인 구매 비용이나 Nginx SSL 발급 오버헤드 없이 **$0 비용**으로 클라이언트의 Mixed Content와 CORS 통신 장애를 완전히 해결하고 100% 정상 연동 성공.
 
+### 📌 성과 48: GitHub Actions 및 GitHub Container Registry (GHCR) 기반의 백엔드 빌드 오프로딩 배포 자동화(CD) 파이프라인 구축
+*   **상황 (Issue)**: AWS t3.micro(1GB RAM) 프리티어 환경에서 백엔드를 직접 빌드(./gradlew build)하거나 도커 로컬 빌드를 수행하면 메모리 고갈(OOM)로 인해 운영 중인 서비스 컨테이너가 셧다운되는 만성적 가용성 위기 잔존. 수동 배포(git pull -> docker compose build) 시 개발자 공수가 크고 DX가 극도로 저하되는 문제 발생.
+*   **대안 분석 & Trade-off**:
+    - *대안 A (Docker Hub 기반 CD 파이프라인)*: Docker Hub의 퍼블릭 이미지 저장소를 활용하여 GitHub Actions에서 빌드 및 푸시한 후, EC2에서 pull. ➔ 가장 널리 쓰이지만, Docker Hub 무료 플랜의 Rate Limit 제한이 있고, 빌드된 이미지를 외부에 비공개하기 위해선 유료 티어를 결제해야 함.
+    - *대안 B (GitHub Container Registry (GHCR) 기반 CD 파이프라인)*: 깃허브 생태계 내에 내장된 GHCR을 활용하고, GITHUB_TOKEN을 사용하여 별도의 도커 계정 연결 없이 배포. ➔ 깃허브 안에서 빌드, 저장, 실행 권한이 하나의 토큰으로 매끄럽게 흐르며, 프라이빗 이미지 저장 한도도 넉넉히 제공됨. (최종 합리화 채택)
+*   **해결 방안 (Action)**:
+    1.  `.github/workflows/deploy.yml` 파일에 GHCR 로그인, Gradle 캐시 활용 빌드, Docker Buildx 이미지 래핑 및 푸시 단계를 포함한 CD 파이프라인 설계.
+    2.  `docker-compose-backend.yml` 설정을 기존 로컬 빌드(`build`) 방식에서 원격 이미지 로드(`image: ghcr.io/...`) 방식으로 리팩토링.
+    3.  `appleboy/ssh-action`을 연동하여, SSH를 통해 안전하게 EC2 인스턴스에 접속한 뒤 최신 코드를 pull하고 도커 이미지를 갱신하는 쉘 스크립트 실행.
+    4.  배포 성공 후 `docker image prune -f` 자동 기동 틱을 삽입하여, dangling 이미지들을 정리하고 t3.micro 서버의 디스크 가용성 보장.
+*   **결과 (Result)**:
+    - 수동 배포 작업을 완전 자동화하여 배포 공수를 100% 절감했으며, 외부 가상 머신(GitHub Actions)에서 컴파일/패키징을 완수함으로써 1GB 가용량 서버 내의 메모리 고갈 원인을 원천 차단하고 안정성을 확보.
+
+---
+
+*   **상황 (Issue)**: Vercel(HTTPS) 환경에 배포된 프론트엔드에서 도메인 및 SSL 인증서가 부재한 AWS EC2 백엔드(HTTP IP:8080)로 직접 API 요청을 보낼 때, 브라우저의 Mixed Content 보안 규격(HTTPS -> HTTP 차단)과 CORS 제약으로 인해 백엔드 데이터 로딩이 전면 거부되는 심각한 통신 결함 발생.
+*   **대안 분석 & Trade-off**:
+    - *대안 A (도메인 구매 + Certbot/Nginx SSL 설정)*: 도메인을 별도로 구입하고 AWS Route53 연동 및 Certbot을 통해 HTTPS 인증서를 적용. ➔ 확실하지만 도메인 유지비가 상시 발생하고, AWS 프리티어 자원 한계에 Nginx 설정/인증서 갱신 백그라운드 오버헤드가 더해져 YAGNI 원칙 및 고정비 $0 원칙에 위배됨.
+    - *대안 B (Vercel Edge Proxy - Rewrites 활용)*: Vercel의 Edge Routing 기능을 활용하여 `vercel.json` 내에 `/api/:path*` 경로를 백엔드 IP 주소 `http://43.201.30.7:8080/api/:path*`로 백그라운드 프록시 매핑(Rewrites). ➔ 클라이언트는 동일 출처인 HTTPS를 통해 요청을 전송하므로 Mixed Content 정책이 원천 우회되며, 외부 도메인 구입 비용 없이 $0로 즉각적인 연동이 가능함. (최종 합리화 채택)
+*   **해결 방안 (Action)**:
+    1.  `vercel.json` 설정에 `rewrites` 규칙을 가동하여 브라우저에서 `/api`로 유도되는 모든 경로를 원격 EC2 백엔드로 Edge-level 프록시 중계하도록 구성.
+    2.  로컬 `api.ts`를 상대 경로 `/api` 호출로 단일화하여 환경 변수에 따른 주소 설정 종속성 완전 제거.
+    3.  백엔드 CORS 허용 Origin 설정을 Vercel의 HTTPS 프론트엔드 도메인(`https://interview-prep-handbook-1xr5.vercel.app`)으로 환경변수 주입 처리하여 요청 전달 시 CORS 통과 무결성 확보.
+*   **결과 (Result)**:
+    - 추가 도메인 구매 비용이나 Nginx SSL 발급 오버헤드 없이 **$0 비용**으로 클라이언트의 Mixed Content와 CORS 통신 장애를 완전히 해결하고 100% 정상 연동 성공.
+
 ---
 
 
