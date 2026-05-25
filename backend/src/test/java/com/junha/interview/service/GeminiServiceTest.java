@@ -13,8 +13,8 @@ class GeminiServiceTest {
     @DisplayName("API 키가 없을 때 Mock 결과값으로 정상 폴백 작동한다")
     void testGeminiFallbackWhenNoApiKey() {
         ObjectMapper objectMapper = new ObjectMapper();
-        WebClient.Builder builder = WebClient.builder();
-        GeminiService geminiService = new GeminiService(builder, objectMapper);
+        WebClient webClient = WebClient.builder().build();
+        GeminiService geminiService = new GeminiService(webClient, objectMapper);
         
         GeminiService.GeminiEvaluation evaluation = geminiService.evaluateAnswer(
                 "Frontend", "JavaScript", "What is closure?", "A closure is...", "User answer"

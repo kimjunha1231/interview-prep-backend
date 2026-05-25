@@ -131,5 +131,32 @@
 *   **맞춤 카테고리 영속화**:
     *   `EmailSubscription` 엔티티에 `category` 속성(기본값 `"ALL"`)을 신설하여 원하는 분야(`Frontend`, `Backend`, `CS`, `ALL`)의 질문만 선택적으로 받아볼 수 있도록 구조를 확장했습니다.
 *   **In-Memory 캐싱 및 비동기 발송 루프**:
-    *   매일 아침 9시 배치 기동 시, 데이터베이스 `Question` 전체를 1회만 조회하여 In-memory Map으로 그룹핑을 완료함으로써 구독자 순회 시 발생하는 N+1 DB 커리 부하를 방어했습니다.
+    *   `Question` 전체를 1회만 조회하여 In-memory Map으로 그룹핑을 완료함으로써 구독자 순회 시 발생하는 N+1 DB 커리 부하를 방어했습니다.
     *   구독자마다 설정된 카테고리를 추출하여 매칭 질문을 무작위 발송하고, 메일 발송 로직 자체는 전용 `mailExecutor` 스레드 풀에 위임(`@Async`)하여 메일 서버의 대기 지연이 전체 스케줄러 배치 기동을 블로킹하지 않도록 장애를 예방했습니다.
+
+---
+
+## 💾 11. Supabase PostgreSQL 및 Connection Pooler 설정
+
+*   **IPv4 호환 Connection Pooler 사용**:
+    *   Supabase Direct Connection Domain은 IPv6-only 주소이므로 IPv4 전용 로컬망에서는 `NoRouteToHostException`이 발생합니다.
+    *   따라서 IPv4 환경 호환을 지원하는 **Regional Connection Pooler Host**(`aws-1-ap-northeast-2.pooler.supabase.com`)와 포트 `5432`를 사용합니다.
+    *   유저명 형식은 반드시 풀러 라우팅 규격에 맞춘 `postgres.[project_id]`를 준수해야 합니다.
+*   **Prepared Statement 충돌 방지 (`prepareThreshold=0`)**:
+    *   트랜잭션 풀링 모드 하에서 커넥션이 무작위로 여러 세션에 공유/교체되므로, 드라이버 기본 설정인 서버 사이드 prepared statement 이름(`S_1`)이 다른 세션과 충돌하여 롤백을 야기하는 오류가 발생합니다.
+    *   이를 방지하기 위해 JDBC URL의 파라미터에 `prepareThreshold=0` 설정을 필수 매핑하여 드라이버 레벨에서 prepared statement 캐싱을 비활성화 처리합니다.
+*   **JPA Auto DDL 충돌 복구 전략**:
+    *   JPA의 `ddl-auto: update`는 기존 PostgreSQL 테이블의 컬럼 타입 변경 캐스팅(Casting)이나 FK 제약 조건 수정을 자동으로 소화하지 못합니다.
+    *   초기 적재 단계에서는 `ddl-auto: create` 설정을 적용하여 모든 기존 테이블 구조를 깨끗하게 재생성한 후 `DataInitializer`를 통해 `questions.json`을 다시 시딩(Seeding)하고, 완료된 즉시 `ddl-auto: update`로 복귀 및 고정하는 방식으로 대응합니다.
+
+---
+
+## ⚡ 12. TanStack Query (React Query v5) 캐싱 가이드
+
+*   **정적 질문 데이터셋 영구 캐싱**:
+    *   개념 학습 핸드북의 질문 데이터는 정적인 리소스로 실시간 동기화가 불필요합니다.
+    *   따라서 `useQuery` 호출 시 `staleTime: Infinity` 및 `gcTime: Infinity` 설정을 명시적으로 부여하여 한 번 패치된 데이터를 브라우저 탭 세션 동안 완벽하게 메모리에 캐싱하고, 탭 재진입 시 API 재요청을 원천 차단하여 즉각적인 렌더링(0ms)을 제공합니다.
+*   **Query Key 설계 일관성**:
+    *   각 탭의 subject key(예: `JAVASCRIPT`, `REACT`)를 쿼리 키 `["questions", selectedSubjectKey]` 형태로 매핑하여, 각 탭 단위의 데이터 병합 및 가공 로직이 queryFn 내에서 격리 수행되도록 단순화했습니다.
+*   **React 19 호환성**:
+    *   Vite 빌드 파이프라인에서 React 19와 리액트 쿼리 v5 간의 Peer Dependency 정합성을 검증 완료하였으며, 컴포넌트 렌더링 생명 주기가 완전히 리액트 쿼리에 의해 안전하게 제어되고 있습니다.

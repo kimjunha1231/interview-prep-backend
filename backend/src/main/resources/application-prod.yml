@@ -1,0 +1,15 @@
+# 프로덕션 전용 설정 (application-prod.yml)
+# 배포 시 SPRING_PROFILES_ACTIVE=prod 환경변수로 활성화됩니다.
+
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+
+# Swagger UI 프로덕션 비활성화 (API 스펙 외부 노출 방지)
+springdoc:
+  swagger-ui:
+    enabled: false
+  api-docs:
+    enabled: false

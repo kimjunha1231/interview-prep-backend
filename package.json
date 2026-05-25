@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev:frontend": "npm run dev --prefix frontend",
-    "dev:backend": "cd backend && ./gradlew bootRun",
+    "dev:backend": "cd backend && ./gradlew bootRun --no-daemon",
     "dev": "concurrently -n \"Backend,Frontend\" -c \"green,blue\" \"npm run dev:backend\" \"npm run dev:frontend\""
   },
   "devDependencies": {

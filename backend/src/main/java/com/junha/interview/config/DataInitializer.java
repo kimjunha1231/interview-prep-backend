@@ -24,9 +24,18 @@ public class DataInitializer implements CommandLineRunner {
     private final QuestionRepository questionRepository;
     private final ResourceLoader resourceLoader;
     private final ObjectMapper objectMapper;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
 
     @Override
     public void run(String... args) throws Exception {
+        try {
+            log.info("Executing DDL to ensure question.title is TEXT type...");
+            jdbcTemplate.execute("ALTER TABLE question ALTER COLUMN title TYPE TEXT");
+            log.info("Successfully ensured question.title is TEXT type.");
+        } catch (Exception e) {
+            log.warn("Could not alter question.title to TEXT (it might already be TEXT, or table doesn't exist yet): {}", e.getMessage());
+        }
+
         log.info("Checking questions database for seeding or synchronization...");
         Resource resource = resourceLoader.getResource("classpath:questions.json");
         try (InputStream inputStream = resource.getInputStream()) {

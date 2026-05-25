@@ -6,6 +6,7 @@ import com.junha.interview.dto.subscription.UnsubscribeRequest;
 import com.junha.interview.service.SubscriptionService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 
@@ -15,6 +16,9 @@ import org.springframework.web.bind.annotation.*;
 public class SubscriptionController {
 
     private final SubscriptionService subscriptionService;
+
+    @Value("${app.frontend-url}")
+    private String frontendUrl;
 
     @PostMapping("/subscribe")
     public ApiResponse<Void> subscribe(@RequestBody @Valid SubscribeRequest request) {
@@ -60,7 +64,7 @@ public class SubscriptionController {
                 "<div class='card'>" +
                 "  <h1>" + escapedTitle + "</h1>" +
                 "  <p>" + escapedMessage + "</p>" +
-                "  <a href='http://localhost:5173' class='btn'>홈으로 이동</a>" +
+                "  <a href='" + frontendUrl + "' class='btn'>홈으로 이동</a>" +
                 "</div>" +
                 "</body>" +
                 "</html>";

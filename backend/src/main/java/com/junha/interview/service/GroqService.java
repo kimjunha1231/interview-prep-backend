@@ -22,17 +22,17 @@ public class GroqService {
     @Value("${ai.groq.api-key}")
     private String apiKey;
 
-    private final WebClient.Builder webClientBuilder;
+    private final WebClient webClient;
     private final ObjectMapper objectMapper;
 
     public String transcribeAudio(MultipartFile file) {
-        if (apiKey == null || apiKey.equals("none") || apiKey.trim().isEmpty()) {
+        if (apiKey == null || apiKey.equals("none") || apiKey.trim().isEmpty() || apiKey.startsWith("your_")) {
             log.warn("Groq API key is not configured. Falling back to mock transcription.");
             return "임시 음성 인식 텍스트입니다. (Groq API Key 설정 필요)";
         }
 
         try {
-            WebClient webClient = webClientBuilder.baseUrl("https://api.groq.com/openai/v1").build();
+            WebClient client = webClient.mutate().baseUrl("https://api.groq.com/openai/v1").build();
 
             MultipartBodyBuilder bodyBuilder = new MultipartBodyBuilder();
             bodyBuilder.part("file", file.getResource());
@@ -42,7 +42,7 @@ public class GroqService {
 
             MultiValueMap<String, HttpEntity<?>> multipartBody = bodyBuilder.build();
 
-            String responseJson = webClient.post()
+            String responseJson = client.post()
                 .uri("/audio/transcriptions")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
                 .contentType(MediaType.MULTIPART_FORM_DATA)

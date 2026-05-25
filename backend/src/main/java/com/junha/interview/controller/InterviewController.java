@@ -71,10 +71,20 @@ public class InterviewController {
             throw new IllegalArgumentException("업로드 가능한 최대 음성 파일 크기는 10MB입니다.");
         }
 
-        // MIME Type 검증 (Content-Type이 audio/로 시작해야 함)
+        // MIME Type 및 파일 확장자 검증 (Content-Type이 audio/로 시작하거나 application/octet-stream이어야 함, 또는 파일 확장자가 오디오 포맷인 경우 허용)
         String contentType = file.getContentType();
-        if (contentType == null || !contentType.startsWith("audio/")) {
-            throw new IllegalArgumentException("올바른 오디오 파일 형식이 아닙니다.");
+        String filename = file.getOriginalFilename();
+        boolean isAudioMime = contentType != null && (contentType.startsWith("audio/") || contentType.equals("application/octet-stream"));
+        boolean isAudioExt = false;
+        if (filename != null) {
+            String lower = filename.toLowerCase();
+            isAudioExt = lower.endsWith(".wav") || lower.endsWith(".webm") || lower.endsWith(".mp3") 
+                      || lower.endsWith(".m4a") || lower.endsWith(".ogg") || lower.endsWith(".mp4") 
+                      || lower.endsWith(".aac") || lower.endsWith(".opus") || lower.endsWith(".3gp");
+        }
+
+        if (!isAudioMime && !isAudioExt) {
+            throw new IllegalArgumentException("올바른 오디오 파일 형식이 아닙니다. (Content-Type: " + contentType + ", Filename: " + filename + ")");
         }
 
         String transcribedText = groqService.transcribeAudio(file);

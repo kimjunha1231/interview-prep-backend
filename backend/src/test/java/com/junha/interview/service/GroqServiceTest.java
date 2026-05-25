@@ -14,8 +14,8 @@ class GroqServiceTest {
     @DisplayName("API 키가 없을 때 Mock 텍스트 결과값으로 정상 폴백 작동한다")
     void testGroqFallbackWhenNoApiKey() {
         ObjectMapper objectMapper = new ObjectMapper();
-        WebClient.Builder builder = WebClient.builder();
-        GroqService groqService = new GroqService(builder, objectMapper);
+        WebClient webClient = WebClient.builder().build();
+        GroqService groqService = new GroqService(webClient, objectMapper);
 
         MockMultipartFile mockFile = new MockMultipartFile(
                 "file", "test.mp3", "audio/mpeg", "test audio data".getBytes()

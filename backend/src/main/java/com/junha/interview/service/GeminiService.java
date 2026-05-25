@@ -22,7 +22,7 @@ public class GeminiService {
     @Value("${ai.gemini.api-key}")
     private String apiKey;
 
-    private final WebClient.Builder webClientBuilder;
+    private final WebClient webClient;
     private final ObjectMapper objectMapper;
 
     @Getter
@@ -46,7 +46,7 @@ public class GeminiService {
     );
 
     public GeminiEvaluation evaluateAnswer(String category, String subject, String title, String perfectAnswer, String userAnswer) {
-        if (apiKey == null || apiKey.equals("none") || apiKey.trim().isEmpty()) {
+        if (apiKey == null || apiKey.equals("none") || apiKey.trim().isEmpty() || apiKey.startsWith("your_")) {
             log.warn("Gemini API key is not configured. Falling back to mock evaluation.");
             return getMockEvaluation(title);
         }
@@ -80,7 +80,7 @@ public class GeminiService {
             category, subject, title, perfectAnswer, userAnswer
         );
 
-        WebClient webClient = webClientBuilder.baseUrl("https://generativelanguage.googleapis.com").build();
+        WebClient client = webClient.mutate().baseUrl("https://generativelanguage.googleapis.com").build();
 
         for (ModelConfig config : MODEL_CHAIN) {
             try {
@@ -95,7 +95,7 @@ public class GeminiService {
                     )
                 );
 
-                String responseJson = webClient.post()
+                String responseJson = client.post()
                     .uri(uriBuilder -> uriBuilder
                         .path("/v1beta/models/" + config.getName() + ":generateContent")
                         .build())
@@ -148,7 +148,7 @@ public class GeminiService {
     }
 
     public List<PortfolioQuestion> generateQuestionsFromPortfolio(String portfolioText, int count) {
-        if (apiKey == null || apiKey.equals("none") || apiKey.trim().isEmpty()) {
+        if (apiKey == null || apiKey.equals("none") || apiKey.trim().isEmpty() || apiKey.startsWith("your_")) {
             log.warn("Gemini API key is not configured. Falling back to mock portfolio questions.");
             return getMockPortfolioQuestions(count);
         }
@@ -175,7 +175,7 @@ public class GeminiService {
             count, portfolioText
         );
 
-        WebClient webClient = webClientBuilder.baseUrl("https://generativelanguage.googleapis.com").build();
+        WebClient client = webClient.mutate().baseUrl("https://generativelanguage.googleapis.com").build();
 
         for (ModelConfig config : MODEL_CHAIN) {
             try {
@@ -190,7 +190,7 @@ public class GeminiService {
                     )
                 );
 
-                String responseJson = webClient.post()
+                String responseJson = client.post()
                     .uri(uriBuilder -> uriBuilder
                         .path("/v1beta/models/" + config.getName() + ":generateContent")
                         .build())
@@ -251,28 +251,30 @@ public class GeminiService {
         if (rawText == null || rawText.trim().isEmpty()) {
             return rawText;
         }
-        if (apiKey == null || apiKey.equals("none") || apiKey.trim().isEmpty()) {
+        if (apiKey == null || apiKey.equals("none") || apiKey.trim().isEmpty() || apiKey.startsWith("your_")) {
             log.warn("Gemini API key is not configured. Skipping STT correction fallback to raw text.");
             return rawText;
         }
 
         String prompt = String.format(
-            "당신은 테크니컬 라이터이자 음성 인식(STT) 교정 전문가입니다. " +
-            "제공된 텍스트는 모의 기술 면접 도중 사용자의 한글 답변 음성을 Whisper API로 1차 인식한 결과입니다.\n\n" +
-            "교정 지침:\n" +
-            "1. 음성 인식 특성상 뭉개지거나 잘못 기입된 전공 기술 전문 용어를 올바른 공식 영문 약어나 용어로 복원해 주세요.\n" +
-            "   (예: 제이피에이 -> JPA, 스프링부트 -> Spring Boot, 리덕스 -> Redux, 씨오알에스 -> CORS, 디아이 -> DI 등)\n" +
-            "2. 어투가 심하게 어색한 띄어쓰기나 오타, 맞춤법을 매끄러운 한글 구어체로 교정해 주세요.\n" +
-            "3. 말실수(예: '어..', '음..', '그..', '아니 그게')나 불필요한 반복어는 정제해 주세요.\n" +
-            "4. 가장 중요: 사용자가 원래 발화하지 않은 새로운 기술 논리나 핵심 주장을 창작(Hallucination)하여 임의로 문장에 덧붙이지 마십시오. " +
-            "오직 발음 왜곡으로 인한 오인식 및 오타 교정만 수행하십시오.\n\n" +
+            "당신은 음성 인식(STT) 오류 교정 전문가입니다. " +
+            "아래 텍스트는 한국어 기술 면접 음성을 Whisper STT로 변환한 원본입니다.\n\n" +
+            "【절대 금지】\n" +
+            "- 사용자가 말한 단어나 어구를 다른 단어로 교체하거나 재해석하는 것 (예: '처리량'을 '처리속도'로, '바로 지금'을 '또 다음을'처럼 의미가 달라지는 모든 교체 금지)\n" +
+            "- 문장 순서를 바꾸거나, 내용을 요약하거나, 문장을 합치거나 나누는 것\n" +
+            "- 원본에 없는 단어나 내용을 새로 추가하는 것\n\n" +
+            "【허용되는 교정만 수행】\n" +
+            "1. STT 오인식으로 발생한 IT 기술 용어의 발음 표기를 원래 표기로 복원\n" +
+            "   (예: '제이피에이' → JPA, '스프링부트' → Spring Boot, '씨오알에스' → CORS)\n" +
+            "2. 명백한 띄어쓰기 오류 수정 (단, 단어 자체는 변경 불가)\n" +
+            "3. '어..', '음..', '그..' 등 의미 없는 필러 단어만 제거 (실제 발화 내용은 보존)\n\n" +
             "응답 규격:\n" +
-            "추가적인 설명이나 markdown 코드 블록 없이, 오직 교정된 최종 한글 텍스트 문장만 반환해 주세요.\n\n" +
-            "음성인식 원본 텍스트:\n%s",
+            "설명 없이 교정된 텍스트만 그대로 반환하세요. 교정할 내용이 없으면 원본을 그대로 반환하세요.\n\n" +
+            "STT 원본:\n%s",
             rawText
         );
 
-        WebClient webClient = webClientBuilder.baseUrl("https://generativelanguage.googleapis.com").build();
+        WebClient client = webClient.mutate().baseUrl("https://generativelanguage.googleapis.com").build();
 
         for (ModelConfig config : MODEL_CHAIN) {
             try {
@@ -284,7 +286,7 @@ public class GeminiService {
                     )
                 );
 
-                String responseJson = webClient.post()
+                String responseJson = client.post()
                     .uri(uriBuilder -> uriBuilder
                         .path("/v1beta/models/" + config.getName() + ":generateContent")
                         .build())

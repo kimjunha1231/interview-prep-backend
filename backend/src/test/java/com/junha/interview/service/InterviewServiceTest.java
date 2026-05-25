@@ -69,6 +69,40 @@ public class InterviewServiceTest {
     }
 
     @Test
+    @DisplayName("포트폴리오 기반 실시간 생성 문항 면접 세션을 정상적으로 시작한다")
+    void testStartSessionForPortfolio() {
+        // Given
+        String portfolioText = "My resume contents";
+        GeminiService.PortfolioQuestion gq1 = new GeminiService.PortfolioQuestion(
+                "질문1", "모범답변1", "PORTFOLIO", "포트폴리오 분석"
+        );
+        given(geminiService.generateQuestionsFromPortfolio(portfolioText, 1))
+                .willReturn(List.of(gq1));
+        given(questionRepository.save(any(Question.class)))
+                .willAnswer(invocation -> {
+                    Question q = invocation.getArgument(0);
+                    q.setId(10L);
+                    return q;
+                });
+        given(sessionRepository.save(any(InterviewSession.class)))
+                .willAnswer(invocation -> {
+                    InterviewSession session = invocation.getArgument(0);
+                    return new InterviewSession(100L, session.getMember(), session.getCreatedAt());
+                });
+
+        // When
+        InterviewSession session = interviewService.startSession(null, "PORTFOLIO", null, null, 1, portfolioText);
+
+        // Then
+        assertThat(session.getId()).isEqualTo(100L);
+        assertThat(session.getQuestions()).hasSize(1);
+        assertThat(session.getQuestions().get(0).getId()).isEqualTo(10L);
+        assertThat(session.getQuestions().get(0).getCategory()).isEqualTo("PORTFOLIO");
+        verify(questionRepository).save(any(Question.class));
+        verify(sessionRepository).save(any(InterviewSession.class));
+    }
+
+    @Test
     @DisplayName("존재하지 않는 회원 ID로 세션 시작을 시도하면 예외를 던진다")
     void testStartSessionWithInvalidMemberId() {
         // Given

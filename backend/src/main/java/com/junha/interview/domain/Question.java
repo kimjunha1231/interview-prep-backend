@@ -41,7 +41,7 @@ public class Question {
     @Column(nullable = false, length = 50)
     private String subject;
 
-    @Column(nullable = false, length = 255)
+    @Column(nullable = false, columnDefinition = "TEXT")
     private String title;
 
     @Column(name = "perfect_answer", nullable = false, columnDefinition = "TEXT")
