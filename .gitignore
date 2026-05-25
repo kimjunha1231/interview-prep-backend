@@ -19,3 +19,7 @@ Thumbs.db
 
 # Exclude frontend directory (handled in a separate repository)
 frontend/
+
+# Editor and AI Agent directories
+.vscode/
+.agents/
