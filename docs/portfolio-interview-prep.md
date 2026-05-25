@@ -707,16 +707,13 @@ sequenceDiagram
 
 ---
 
-*   **상황 (Issue)**: Vercel(HTTPS) 환경에 배포된 프론트엔드에서 도메인 및 SSL 인증서가 부재한 AWS EC2 백엔드(HTTP IP:8080)로 직접 API 요청을 보낼 때, 브라우저의 Mixed Content 보안 규격(HTTPS -> HTTP 차단)과 CORS 제약으로 인해 백엔드 데이터 로딩이 전면 거부되는 심각한 통신 결함 발생.
-*   **대안 분석 & Trade-off**:
-    - *대안 A (도메인 구매 + Certbot/Nginx SSL 설정)*: 도메인을 별도로 구입하고 AWS Route53 연동 및 Certbot을 통해 HTTPS 인증서를 적용. ➔ 확실하지만 도메인 유지비가 상시 발생하고, AWS 프리티어 자원 한계에 Nginx 설정/인증서 갱신 백그라운드 오버헤드가 더해져 YAGNI 원칙 및 고정비 $0 원칙에 위배됨.
-    - *대안 B (Vercel Edge Proxy - Rewrites 활용)*: Vercel의 Edge Routing 기능을 활용하여 `vercel.json` 내에 `/api/:path*` 경로를 백엔드 IP 주소 `http://43.201.30.7:8080/api/:path*`로 백그라운드 프록시 매핑(Rewrites). ➔ 클라이언트는 동일 출처인 HTTPS를 통해 요청을 전송하므로 Mixed Content 정책이 원천 우회되며, 외부 도메인 구입 비용 없이 $0로 즉각적인 연동이 가능함. (최종 합리화 채택)
+### 📌 성과 49: GitHub Actions CD 워크플로우 내 Docker 공식 Action 네임스페이스 매핑 오류 해결 및 배포 자동화 복구 (Troubleshooting)
+*   **상황 (Issue)**: GitHub Actions CD 자동 배포 파이프라인(`deploy.yml`) 동작 시, `Unable to resolve action actions/login-action, repository not found. Unable to resolve action actions/setup-buildx-action, repository not found` 에러가 발생하여 빌드 및 배포 자동화 프로세스가 전면 중단됨.
 *   **해결 방안 (Action)**:
-    1.  `vercel.json` 설정에 `rewrites` 규칙을 가동하여 브라우저에서 `/api`로 유도되는 모든 경로를 원격 EC2 백엔드로 Edge-level 프록시 중계하도록 구성.
-    2.  로컬 `api.ts`를 상대 경로 `/api` 호출로 단일화하여 환경 변수에 따른 주소 설정 종속성 완전 제거.
-    3.  백엔드 CORS 허용 Origin 설정을 Vercel의 HTTPS 프론트엔드 도메인(`https://interview-prep-handbook-1xr5.vercel.app`)으로 환경변수 주입 처리하여 요청 전달 시 CORS 통과 무결성 확보.
+    1. `deploy.yml` 파일에서 `actions/setup-buildx-action@v3`를 `docker/setup-buildx-action@v3`로 수정하여 Docker Buildx 환경 설정 모듈을 정정.
+    2. `actions/login-action@v3`를 `docker/login-action@v3`로 수정하여 GitHub Container Registry(GHCR) 로그인 모듈을 Docker 공식 레포지토리 경로로 정정.
 *   **결과 (Result)**:
-    - 추가 도메인 구매 비용이나 Nginx SSL 발급 오버헤드 없이 **$0 비용**으로 클라이언트의 Mixed Content와 CORS 통신 장애를 완전히 해결하고 100% 정상 연동 성공.
+    - 잘못 설정된 Docker Actions의 네임스페이스를 Docker 공식 레포지토리 경로로 정정하여 CD 파이프라인의 모듈 해석 오류를 완벽하게 정비하고, 백엔드 컨테이너의 자동 빌드 및 EC2 서버 원격 배포 자동화 흐름을 100% 정상화함.
 
 ---
 
@@ -1068,4 +1065,11 @@ sequenceDiagram
   - **최종 설계 합리화**:
     - 개발 단계 및 1인 운영 수준의 토이 프로젝트 환경에서는 플랫폼 종속성 우려보다 고정 비용 절감과 서버의 리소스 보호가 최우선 순위라고 판단하여 **Vercel Edge Proxy(Rewrites) 기법을 최종 채택**하였습니다. 프론트엔드 레포지토리에 `vercel.json`을 탑재하여 백엔드 IP 주소를 리다이렉션함으로써, 추가 자원 낭비나 수동 Nginx 세팅 없이 즉각적으로 Mixed Content 차단 현상을 안정적으로 우회 돌파하였습니다.
 
-
+### **Q38. GitHub Actions를 이용한 도커 기반 배포 자동화(CD) 구축 과정에서 발생한 Action 모듈 해석 오류와 이를 어떻게 트러블슈팅했는지 설명해 주세요.**
+- **모범 답변**:
+  - **문제 인식**: GitHub Actions를 이용하여 도커 빌드 및 배포 자동화(CD)를 구축하는 과정에서 `Unable to resolve action actions/login-action, repository not found`와 같은 모듈 경로 에러가 발생하여 CI/CD 파이프라인이 즉각 중단되었습니다. 이는 GitHub Actions 러너가 해당 모듈을 외부 오픈소스 저장소에서 찾을 수 없어 발생한 경로 탐색 결함이었습니다.
+  - **대안 분석 & Trade-off**:
+    1. *대안 A (동일 기능을 수행하는 단순 shell script로 대체)*: `docker login` 이나 `docker buildx` 명령어를 Actions YAML 상의 `run` 블록에서 CLI 명령어로 직접 수행하도록 하드코딩. ➔ 이식성은 올라가지만, Docker Credential 관리의 편의성이나 Buildx 캐시(cache-from: type=gha) 등의 최적화 플러그인을 온전히 활용하기 어렵고 코드가 지저분해짐.
+    2. *대안 B (공식 Docker Action 모듈로 네임스페이스 정상화 - 채택)*: 에러의 원인이 단순 네임스페이스 오설정(`actions/`가 아닌 `docker/` 네임스페이스)임을 식별하고 공식 모듈 이름인 `docker/login-action` 및 `docker/setup-buildx-action`으로 바인딩을 복원. ➔ 추가적인 의존성 수정이나 보안 리스크 없이 Docker 공식 Actions 생태계의 풍부한 옵션과 캐싱을 안전하게 활용 가능.
+  - **최종 설계 합리화**:
+    - 파이프라인의 안정성 및 효율적 캐싱을 극대화하기 위해 **공식 Docker Action 네임스페이스 전환(대안 B)**을 적용하여 트러블슈팅했습니다. `deploy.yml` 파일에서 `actions/login-action`을 `docker/login-action`으로, `actions/setup-buildx-action`을 `docker/setup-buildx-action`으로 수정하여 GitHub의 패키지 저장소와 Docker Buildx 빌더 간의 통합을 정상 기동시켰습니다. 이를 통해 불필요한 빌드 환경 에러를 소거하고 빌드 오프로딩 배포 과정을 완전히 복구시켰습니다.
