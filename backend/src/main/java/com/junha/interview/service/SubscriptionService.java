@@ -2,6 +2,7 @@ package com.junha.interview.service;
 
 import com.junha.interview.domain.EmailSubscription;
 import com.junha.interview.repository.EmailSubscriptionRepository;
+import com.junha.interview.common.EmailMaskUtils;
 import com.junha.interview.common.EncryptionUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -63,11 +64,11 @@ public class SubscriptionService {
             existing.setEncryptedEmail(encryptedEmail); // Update encrypted email just in case the key changed
             if (existing.isActive()) {
                 subscriptionRepository.save(existing);
-                log.info("Successfully updated subscription category to {} for email: {}", dbCategory, maskEmail(normalizedEmail));
+                log.info("Successfully updated subscription category to {} for email: {}", dbCategory, EmailMaskUtils.mask(normalizedEmail));
             } else {
                 existing.setActive(true);
                 subscriptionRepository.save(existing);
-                log.info("Successfully re-activated subscription for email: {} with category: {}", maskEmail(normalizedEmail), dbCategory);
+                log.info("Successfully re-activated subscription for email: {} with category: {}", EmailMaskUtils.mask(normalizedEmail), dbCategory);
             }
         } else {
             EmailSubscription newSubscription = new EmailSubscription(
@@ -79,7 +80,7 @@ public class SubscriptionService {
                     LocalDateTime.now()
             );
             subscriptionRepository.save(newSubscription);
-            log.info("Successfully registered new subscription for email: {} with category: {}", maskEmail(normalizedEmail), dbCategory);
+            log.info("Successfully registered new subscription for email: {} with category: {}", EmailMaskUtils.mask(normalizedEmail), dbCategory);
         }
     }
 
@@ -94,13 +95,13 @@ public class SubscriptionService {
                 .orElseThrow(() -> new IllegalArgumentException("등록되지 않은 이메일 주소입니다."));
 
         if (!subscription.isActive()) {
-            log.warn("Subscription for email {} is already inactive.", maskEmail(normalizedEmail));
+            log.warn("Subscription for email {} is already inactive.", EmailMaskUtils.mask(normalizedEmail));
             return;
         }
 
         subscription.setActive(false);
         subscriptionRepository.save(subscription);
-        log.info("Successfully unsubscribed email: {}", maskEmail(normalizedEmail));
+        log.info("Successfully unsubscribed email: {}", EmailMaskUtils.mask(normalizedEmail));
     }
 
     @Transactional
@@ -121,18 +122,5 @@ public class SubscriptionService {
         log.info("Successfully unsubscribed by token hash: {}", emailHash);
     }
 
-
-    private String maskEmail(String email) {
-        if (email == null || !email.contains("@")) {
-            return email;
-        }
-        int atIndex = email.indexOf("@");
-        String local = email.substring(0, atIndex);
-        String domain = email.substring(atIndex);
-        if (local.length() <= 2) {
-            return local + "***" + domain;
-        }
-        return local.substring(0, 2) + "***" + domain;
-    }
 }
 

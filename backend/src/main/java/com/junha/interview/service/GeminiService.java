@@ -11,6 +11,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
+
 import java.util.List;
 import java.util.Map;
 
@@ -45,8 +47,86 @@ public class GeminiService {
         new ModelConfig("gemini-2.5-pro", false)
     );
 
+    // ─── 공통 유틸: API Key 유효성 검사 ───────────────────────────────
+    private boolean isApiKeyConfigured() {
+        return apiKey != null
+                && !apiKey.equals("none")
+                && !apiKey.trim().isEmpty()
+                && !apiKey.startsWith("your_");
+    }
+
+    // ─── 공통 유틸: Gemini API 호출 + Model Fallback Chain ─────────────
+    /**
+     * Gemini API에 프롬프트를 전송하고 응답 텍스트를 추출합니다.
+     * MODEL_CHAIN 순서대로 시도하며, 모든 모델이 실패하면 null을 반환합니다.
+     *
+     * @param prompt           전송할 프롬프트 텍스트
+     * @param jsonResponseMode true이면 응답 MIME Type을 application/json으로 지정
+     * @param operationName    로그 식별용 작업 이름
+     * @return 응답 텍스트 또는 모든 모델 실패 시 null
+     */
+    private String callGeminiApi(String prompt, boolean jsonResponseMode, String operationName) {
+        WebClient client = webClient.mutate()
+                .baseUrl("https://generativelanguage.googleapis.com").build();
+
+        for (ModelConfig config : MODEL_CHAIN) {
+            try {
+                log.info("Attempting {} using model: {}", operationName, config.getName());
+
+                Map<String, Object> requestBody;
+                if (jsonResponseMode) {
+                    requestBody = Map.of(
+                        "contents", List.of(
+                            Map.of("parts", List.of(Map.of("text", prompt)))
+                        ),
+                        "generationConfig", Map.of(
+                            "responseMimeType", "application/json"
+                        )
+                    );
+                } else {
+                    requestBody = Map.of(
+                        "contents", List.of(
+                            Map.of("parts", List.of(Map.of("text", prompt)))
+                        )
+                    );
+                }
+
+                String responseJson = client.post()
+                    .uri(uriBuilder -> uriBuilder
+                        .path("/v1beta/models/" + config.getName() + ":generateContent")
+                        .build())
+                    .header("x-goog-api-key", apiKey)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(requestBody)
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .block();
+
+                Map<String, Object> responseMap = objectMapper.readValue(responseJson, Map.class);
+                List<Map<String, Object>> candidates = (List<Map<String, Object>>) responseMap.get("candidates");
+                Map<String, Object> content = (Map<String, Object>) candidates.get(0).get("content");
+                List<Map<String, Object>> parts = (List<Map<String, Object>>) content.get("parts");
+                String textResult = (String) parts.get(0).get("text");
+
+                log.info("Successfully completed {} using model: {}", operationName, config.getName());
+                return textResult;
+
+            } catch (WebClientResponseException e) {
+                log.warn("Failed {} with model: {} due to HTTP status: {}. Retrying with next model...",
+                         operationName, config.getName(), e.getStatusCode());
+            } catch (Exception e) {
+                log.warn("Failed {} with model: {} due to unexpected error. Retrying with next model...",
+                         operationName, config.getName(), e);
+            }
+        }
+
+        log.error("All models in the fallback chain failed for {}.", operationName);
+        return null;
+    }
+
+    // ─── 비즈니스 로직: AI 답변 채점 ──────────────────────────────────
     public GeminiEvaluation evaluateAnswer(String category, String subject, String title, String perfectAnswer, String userAnswer) {
-        if (apiKey == null || apiKey.equals("none") || apiKey.trim().isEmpty() || apiKey.startsWith("your_")) {
+        if (!isApiKeyConfigured()) {
             log.warn("Gemini API key is not configured. Falling back to mock evaluation.");
             return getMockEvaluation(title);
         }
@@ -80,52 +160,15 @@ public class GeminiService {
             category, subject, title, perfectAnswer, userAnswer
         );
 
-        WebClient client = webClient.mutate().baseUrl("https://generativelanguage.googleapis.com").build();
-
-        for (ModelConfig config : MODEL_CHAIN) {
+        String textResult = callGeminiApi(prompt, true, "AI evaluation");
+        if (textResult != null) {
             try {
-                log.info("Attempting AI evaluation using model: {}", config.getName());
-
-                Map<String, Object> requestBody = Map.of(
-                    "contents", List.of(
-                        Map.of("parts", List.of(Map.of("text", prompt)))
-                    ),
-                    "generationConfig", Map.of(
-                        "responseMimeType", "application/json"
-                    )
-                );
-
-                String responseJson = client.post()
-                    .uri(uriBuilder -> uriBuilder
-                        .path("/v1beta/models/" + config.getName() + ":generateContent")
-                        .build())
-                    .header("x-goog-api-key", apiKey)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .bodyValue(requestBody)
-                    .retrieve()
-                    .bodyToMono(String.class)
-                    .block();
-
-                Map<String, Object> responseMap = objectMapper.readValue(responseJson, Map.class);
-                List<Map<String, Object>> candidates = (List<Map<String, Object>>) responseMap.get("candidates");
-                Map<String, Object> content = (Map<String, Object>) candidates.get(0).get("content");
-                List<Map<String, Object>> parts = (List<Map<String, Object>>) content.get("parts");
-                String textResult = (String) parts.get(0).get("text");
-
-                GeminiEvaluation evaluation = objectMapper.readValue(textResult, GeminiEvaluation.class);
-                log.info("Successfully evaluated answer using model: {}", config.getName());
-                return evaluation;
-
-            } catch (org.springframework.web.reactive.function.client.WebClientResponseException e) {
-                log.warn("Failed to evaluate with model: {} due to HTTP status: {}. Retrying with next model...",
-                         config.getName(), e.getStatusCode());
+                return objectMapper.readValue(textResult, GeminiEvaluation.class);
             } catch (Exception e) {
-                log.warn("Failed to evaluate with model: {} due to unexpected error. Retrying with next model...",
-                         config.getName(), e);
+                log.warn("Failed to parse evaluation JSON. Falling back to mock.", e);
             }
         }
 
-        log.error("All models in the fallback chain failed. Falling back to mock evaluation.");
         return getMockEvaluation(title);
     }
 
@@ -136,6 +179,7 @@ public class GeminiService {
         return new GeminiEvaluation(score, feedback, tailQuestion);
     }
 
+    // ─── 비즈니스 로직: 포트폴리오 기반 질문 생성 ──────────────────────
     @Getter
     @Setter
     @NoArgsConstructor
@@ -148,7 +192,7 @@ public class GeminiService {
     }
 
     public List<PortfolioQuestion> generateQuestionsFromPortfolio(String portfolioText, int count) {
-        if (apiKey == null || apiKey.equals("none") || apiKey.trim().isEmpty() || apiKey.startsWith("your_")) {
+        if (!isApiKeyConfigured()) {
             log.warn("Gemini API key is not configured. Falling back to mock portfolio questions.");
             return getMockPortfolioQuestions(count);
         }
@@ -175,51 +219,18 @@ public class GeminiService {
             count, portfolioText
         );
 
-        WebClient client = webClient.mutate().baseUrl("https://generativelanguage.googleapis.com").build();
-
-        for (ModelConfig config : MODEL_CHAIN) {
+        String textResult = callGeminiApi(prompt, true, "Portfolio question generation");
+        if (textResult != null) {
             try {
-                log.info("Attempting Portfolio question generation using model: {}", config.getName());
-
-                Map<String, Object> requestBody = Map.of(
-                    "contents", List.of(
-                        Map.of("parts", List.of(Map.of("text", prompt)))
-                    ),
-                    "generationConfig", Map.of(
-                        "responseMimeType", "application/json"
-                    )
-                );
-
-                String responseJson = client.post()
-                    .uri(uriBuilder -> uriBuilder
-                        .path("/v1beta/models/" + config.getName() + ":generateContent")
-                        .build())
-                    .header("x-goog-api-key", apiKey)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .bodyValue(requestBody)
-                    .retrieve()
-                    .bodyToMono(String.class)
-                    .block();
-
-                Map<String, Object> responseMap = objectMapper.readValue(responseJson, Map.class);
-                List<Map<String, Object>> candidates = (List<Map<String, Object>>) responseMap.get("candidates");
-                Map<String, Object> content = (Map<String, Object>) candidates.get(0).get("content");
-                List<Map<String, Object>> parts = (List<Map<String, Object>>) content.get("parts");
-                String textResult = (String) parts.get(0).get("text");
-
-                List<PortfolioQuestion> questions = objectMapper.readValue(
-                    textResult, 
+                return objectMapper.readValue(
+                    textResult,
                     objectMapper.getTypeFactory().constructCollectionType(List.class, PortfolioQuestion.class)
                 );
-                log.info("Successfully generated portfolio questions using model: {}", config.getName());
-                return questions;
-
             } catch (Exception e) {
-                log.warn("Failed to generate questions with model: {} due to error. Retrying next...", config.getName(), e);
+                log.warn("Failed to parse portfolio questions JSON. Falling back to mock.", e);
             }
         }
 
-        log.error("All models failed for portfolio question generation. Falling back to mock.");
         return getMockPortfolioQuestions(count);
     }
 
@@ -247,11 +258,12 @@ public class GeminiService {
         return mocks.subList(0, Math.min(count, mocks.size()));
     }
 
+    // ─── 비즈니스 로직: STT 텍스트 교정 ──────────────────────────────
     public String correctTranscribedText(String rawText) {
         if (rawText == null || rawText.trim().isEmpty()) {
             return rawText;
         }
-        if (apiKey == null || apiKey.equals("none") || apiKey.trim().isEmpty() || apiKey.startsWith("your_")) {
+        if (!isApiKeyConfigured()) {
             log.warn("Gemini API key is not configured. Skipping STT correction fallback to raw text.");
             return rawText;
         }
@@ -274,50 +286,15 @@ public class GeminiService {
             rawText
         );
 
-        WebClient client = webClient.mutate().baseUrl("https://generativelanguage.googleapis.com").build();
-
-        for (ModelConfig config : MODEL_CHAIN) {
-            try {
-                log.info("Attempting STT text correction using model: {}", config.getName());
-
-                Map<String, Object> requestBody = Map.of(
-                    "contents", List.of(
-                        Map.of("parts", List.of(Map.of("text", prompt)))
-                    )
-                );
-
-                String responseJson = client.post()
-                    .uri(uriBuilder -> uriBuilder
-                        .path("/v1beta/models/" + config.getName() + ":generateContent")
-                        .build())
-                    .header("x-goog-api-key", apiKey)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .bodyValue(requestBody)
-                    .retrieve()
-                    .bodyToMono(String.class)
-                    .block();
-
-                Map<String, Object> responseMap = objectMapper.readValue(responseJson, Map.class);
-                List<Map<String, Object>> candidates = (List<Map<String, Object>>) responseMap.get("candidates");
-                Map<String, Object> content = (Map<String, Object>) candidates.get(0).get("content");
-                List<Map<String, Object>> parts = (List<Map<String, Object>>) content.get("parts");
-                String correctedText = (String) parts.get(0).get("text");
-
-                if (correctedText != null) {
-                    correctedText = correctedText.trim();
-                    log.info("Successfully corrected STT text using model: {}", config.getName());
-                    return correctedText;
-                }
-
-            } catch (Exception e) {
-                log.warn("Failed to correct STT text with model: {} due to error. Retrying next...", config.getName(), e);
-            }
+        String correctedText = callGeminiApi(prompt, false, "STT text correction");
+        if (correctedText != null) {
+            return correctedText.trim();
         }
 
-        log.error("All models failed for STT text correction. Falling back to raw text.");
         return rawText;
     }
 
+    // ─── DTO ──────────────────────────────────────────────────────────
     @Getter
     @Setter
     @NoArgsConstructor

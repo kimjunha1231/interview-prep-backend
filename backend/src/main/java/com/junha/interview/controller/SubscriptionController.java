@@ -1,6 +1,7 @@
 package com.junha.interview.controller;
 
 import com.junha.interview.common.ApiResponse;
+import com.junha.interview.common.HtmlEscapeUtils;
 import com.junha.interview.dto.subscription.SubscribeRequest;
 import com.junha.interview.dto.subscription.UnsubscribeRequest;
 import com.junha.interview.service.SubscriptionService;
@@ -44,8 +45,8 @@ public class SubscriptionController {
 
     private String buildHtmlPage(String title, String message, boolean success) {
         String color = success ? "#0066cc" : "#ff453a";
-        String escapedTitle = escapeHtml(title);
-        String escapedMessage = escapeHtml(message);
+        String escapedTitle = HtmlEscapeUtils.escape(title);
+        String escapedMessage = HtmlEscapeUtils.escape(message);
         return "<!DOCTYPE html>" +
                 "<html>" +
                 "<head>" +
@@ -70,12 +71,4 @@ public class SubscriptionController {
                 "</html>";
     }
 
-    private String escapeHtml(String text) {
-        if (text == null) return "";
-        return text.replace("&", "&amp;")
-                .replace("<", "&lt;")
-                .replace(">", "&gt;")
-                .replace("\"", "&quot;")
-                .replace("'", "&#x27;");
-    }
 }

@@ -25,8 +25,15 @@ public class GroqService {
     private final WebClient webClient;
     private final ObjectMapper objectMapper;
 
+    private boolean isApiKeyConfigured() {
+        return apiKey != null
+                && !apiKey.equals("none")
+                && !apiKey.trim().isEmpty()
+                && !apiKey.startsWith("your_");
+    }
+
     public String transcribeAudio(MultipartFile file) {
-        if (apiKey == null || apiKey.equals("none") || apiKey.trim().isEmpty() || apiKey.startsWith("your_")) {
+        if (!isApiKeyConfigured()) {
             log.warn("Groq API key is not configured. Falling back to mock transcription.");
             return "임시 음성 인식 텍스트입니다. (Groq API Key 설정 필요)";
         }

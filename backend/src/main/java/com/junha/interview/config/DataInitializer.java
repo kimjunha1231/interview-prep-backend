@@ -13,7 +13,12 @@ import org.springframework.core.io.ResourceLoader;
 import org.springframework.stereotype.Component;
 
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import org.springframework.jdbc.core.JdbcTemplate;
 
 @Component
 @Profile("local")
@@ -24,7 +29,7 @@ public class DataInitializer implements CommandLineRunner {
     private final QuestionRepository questionRepository;
     private final ResourceLoader resourceLoader;
     private final ObjectMapper objectMapper;
-    private final org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
+    private final JdbcTemplate jdbcTemplate;
 
     @Override
     public void run(String... args) throws Exception {
@@ -49,9 +54,9 @@ public class DataInitializer implements CommandLineRunner {
                 log.info("Database already contains questions. Starting rich fields synchronization...");
                 List<Question> existingQuestions = questionRepository.findAll();
                 java.util.Map<String, Question> existingMap = existingQuestions.stream()
-                        .collect(java.util.stream.Collectors.toMap(Question::getTitle, q -> q, (q1, q2) -> q1));
+                        .collect(Collectors.toMap(Question::getTitle, q -> q, (q1, q2) -> q1));
                 
-                java.util.List<Question> toSave = new java.util.ArrayList<>();
+                List<Question> toSave = new ArrayList<>();
                 int updateCount = 0;
                 int insertCount = 0;
                 

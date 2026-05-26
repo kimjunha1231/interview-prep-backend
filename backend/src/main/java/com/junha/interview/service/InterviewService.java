@@ -15,6 +15,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 @Service
@@ -64,8 +66,8 @@ public class InterviewService {
                         .map(String::toLowerCase)
                         .toList();
                 List<Question> candidates = questionRepository.findQuestionsInSubjects(lowerSubjects);
-                java.util.List<Question> shuffled = new java.util.ArrayList<>(candidates);
-                java.util.Collections.shuffle(shuffled);
+                List<Question> shuffled = new ArrayList<>(candidates);
+                Collections.shuffle(shuffled);
                 questions = shuffled.stream().limit(count).toList();
             } else {
                 questions = questionRepository.findRandomQuestions(dbCategory, subject, count);

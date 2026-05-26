@@ -1,10 +1,13 @@
 package com.junha.interview.service;
 
+import com.junha.interview.common.EmailMaskUtils;
+import com.junha.interview.common.HtmlEscapeUtils;
+import com.junha.interview.common.EncryptionUtils;
 import com.junha.interview.domain.InterviewHistory;
 import jakarta.mail.internet.MimeMessage;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.lang.Nullable;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
@@ -19,11 +22,8 @@ import org.commonmark.node.Node;
 @Service
 public class EmailService {
 
-    @Autowired(required = false)
-    private JavaMailSender mailSender;
-
-    @Autowired
-    private com.junha.interview.common.EncryptionUtils encryptionUtils;
+    private final JavaMailSender mailSender;
+    private final EncryptionUtils encryptionUtils;
 
     @Value("${app.frontend-url}")
     private String frontendUrl;
@@ -31,15 +31,20 @@ public class EmailService {
     @Value("${app.backend-url}")
     private String backendUrl;
 
+    public EmailService(@Nullable JavaMailSender mailSender, EncryptionUtils encryptionUtils) {
+        this.mailSender = mailSender;
+        this.encryptionUtils = encryptionUtils;
+    }
+
     public void sendReportEmail(String toEmail, Long sessionId, List<InterviewHistory> historyList) {
-        log.info("Starting email dispatch process for Session ID: {} to recipient: {}", sessionId, maskEmail(toEmail));
+        log.info("Starting email dispatch process for Session ID: {} to recipient: {}", sessionId, EmailMaskUtils.mask(toEmail));
 
         String htmlContent = buildHtmlReport(sessionId, historyList);
 
         if (mailSender == null) {
             log.warn("JavaMailSender is not configured. Falling back to logging the email content.");
             log.info("================ FALLBACK EMAIL REPORT (SESSION: {}) ================", sessionId);
-            log.info("To: {}", maskEmail(toEmail));
+            log.info("To: {}", EmailMaskUtils.mask(toEmail));
             log.info("Subject: [Interview Handbook] 모의 면접 결과 보고서 (Session #{})", sessionId);
             log.info("Content Preview:\n{}", htmlContent);
             log.info("====================================================================");
@@ -55,11 +60,11 @@ public class EmailService {
             helper.setText(htmlContent, true);
 
             mailSender.send(message);
-            log.info("Email successfully sent to {}", maskEmail(toEmail));
+            log.info("Email successfully sent to {}", EmailMaskUtils.mask(toEmail));
         } catch (Exception e) {
-            log.error("Failed to send email via SMTP to {}. Error: {}", maskEmail(toEmail), e.getMessage(), e);
+            log.error("Failed to send email via SMTP to {}. Error: {}", EmailMaskUtils.mask(toEmail), e.getMessage(), e);
             log.info("================ FALLBACK EMAIL REPORT (SMTP FAILURE) ================");
-            log.info("To: {}", maskEmail(toEmail));
+            log.info("To: {}", EmailMaskUtils.mask(toEmail));
             log.info("Subject: [Interview Handbook] 모의 면접 결과 보고서 (Session #{})", sessionId);
             log.info("======================================================================");
         }
@@ -144,7 +149,7 @@ public class EmailService {
             sb.append("      <div class='card-body'>");
             
             sb.append("        <h4 class='section-title'>나의 답변</h4>");
-            sb.append("        <p class='section-content'>" + escapeHtml(history.getUserAnswer()) + "</p>");
+            sb.append("        <p class='section-content'>" + HtmlEscapeUtils.escapeWithLineBreaks(history.getUserAnswer()) + "</p>");
 
             if (history.getQuestion().getPerfectAnswer() != null && !history.getQuestion().getPerfectAnswer().trim().isEmpty()) {
                 sb.append("        <h4 class='section-title'>모범 답안</h4>");
@@ -156,7 +161,7 @@ public class EmailService {
 
             if (history.getTailQuestion() != null && !history.getTailQuestion().trim().isEmpty()) {
                 sb.append("        <h4 class='section-title'>추천 꼬리 질문</h4>");
-                sb.append("        <p class='section-content tail'>" + escapeHtml(history.getTailQuestion()) + "</p>");
+                sb.append("        <p class='section-content tail'>" + HtmlEscapeUtils.escapeWithLineBreaks(history.getTailQuestion()) + "</p>");
             }
 
             sb.append("      </div>");
@@ -175,16 +180,6 @@ public class EmailService {
         return sb.toString();
     }
 
-    private String escapeHtml(String text) {
-        if (text == null) return "";
-        return text.replace("&", "&amp;")
-                .replace("<", "&lt;")
-                .replace(">", "&gt;")
-                .replace("\"", "&quot;")
-                .replace("'", "&#x27;")
-                .replace("\n", "<br/>");
-    }
-
     private String markdownToHtml(String markdown) {
         if (markdown == null || markdown.trim().isEmpty()) {
             return "";
@@ -197,14 +192,14 @@ public class EmailService {
 
     @Async("mailExecutor")
     public void sendDailyQuestionEmail(String toEmail, com.junha.interview.domain.Question question) {
-        log.info("Starting Daily Question email dispatch to: {}", maskEmail(toEmail));
+        log.info("Starting Daily Question email dispatch to: {}", EmailMaskUtils.mask(toEmail));
 
         String htmlContent = buildDailyQuestionHtml(toEmail, question);
 
         if (mailSender == null) {
             log.warn("JavaMailSender is not configured. Falling back to logging the daily question email content.");
             log.info("================ FALLBACK DAILY QUESTION EMAIL ================");
-            log.info("To: {}", maskEmail(toEmail));
+            log.info("To: {}", EmailMaskUtils.mask(toEmail));
             log.info("Subject: [Daily Handbook] 오늘의 면접 챌린지: {}", question.getTitle());
             log.info("Content Preview:\n{}", htmlContent);
             log.info("===============================================================");
@@ -220,9 +215,9 @@ public class EmailService {
             helper.setText(htmlContent, true);
 
             mailSender.send(message);
-            log.info("Daily Question email successfully sent to {}", maskEmail(toEmail));
+            log.info("Daily Question email successfully sent to {}", EmailMaskUtils.mask(toEmail));
         } catch (Exception e) {
-            log.error("Failed to send Daily Question email via SMTP to {}. Error: {}", maskEmail(toEmail), e.getMessage(), e);
+            log.error("Failed to send Daily Question email via SMTP to {}. Error: {}", EmailMaskUtils.mask(toEmail), e.getMessage(), e);
         }
     }
 
@@ -277,16 +272,4 @@ public class EmailService {
         return sb.toString();
     }
 
-    private String maskEmail(String email) {
-        if (email == null || !email.contains("@")) {
-            return email;
-        }
-        int atIndex = email.indexOf("@");
-        String local = email.substring(0, atIndex);
-        String domain = email.substring(atIndex);
-        if (local.length() <= 2) {
-            return local + "***" + domain;
-        }
-        return local.substring(0, 2) + "***" + domain;
-    }
 }

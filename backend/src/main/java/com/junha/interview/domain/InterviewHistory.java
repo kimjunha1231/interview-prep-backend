@@ -35,6 +35,6 @@ public class InterviewHistory {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String feedback;
 
-    @Column(name = "tail_question", length = 255)
+    @Column(name = "tail_question", columnDefinition = "TEXT")
     private String tailQuestion;
 }
