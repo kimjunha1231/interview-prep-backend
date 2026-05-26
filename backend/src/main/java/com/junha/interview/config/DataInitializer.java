@@ -37,6 +37,20 @@ public class DataInitializer implements CommandLineRunner {
             log.info("Executing DDL to ensure question.title is TEXT type...");
             jdbcTemplate.execute("ALTER TABLE question ALTER COLUMN title TYPE TEXT");
             log.info("Successfully ensured question.title is TEXT type.");
+
+            try {
+                log.info("Correcting polluted titles in DB prior to synchronization...");
+                jdbcTemplate.execute("UPDATE question SET title = '최종적 일관성(Eventual Consistency)' WHERE title = 'Generate the representative question' OR title = '{title}'");
+                jdbcTemplate.execute("UPDATE question SET title = '유닛 테스트의 정의와 목적' WHERE title = 'cs_cs_432' OR title = '유닛 테스트'");
+                jdbcTemplate.execute("UPDATE question SET title = 'var 키워드는 뭔가요?' WHERE title = 'fe_javascript_301'");
+                jdbcTemplate.execute("UPDATE question SET title = '자바스크립트의 Truthy와 Falsy 개념' WHERE title = 'fe_javascript_310'");
+                jdbcTemplate.execute("UPDATE question SET title = '자바스크립트 프로미스(Promise)의 개념과 동작 원리' WHERE title = 'fe_javascript_366'");
+                jdbcTemplate.execute("UPDATE question SET title = '전역 상태 관리 라이브러리의 필요성과 동작 원리' WHERE title = 'fe_react_059'");
+                jdbcTemplate.execute("UPDATE question SET title = 'DOM에서 Node와 Element의 차이점' WHERE title = 'fe_react_060'");
+                log.info("Successfully corrected polluted titles in DB.");
+            } catch (Exception e) {
+                log.warn("Could not correct polluted titles (they might have been corrected already, or table doesn't exist yet): {}", e.getMessage());
+            }
         } catch (Exception e) {
             log.warn("Could not alter question.title to TEXT (it might already be TEXT, or table doesn't exist yet): {}", e.getMessage());
         }
@@ -63,14 +77,45 @@ public class DataInitializer implements CommandLineRunner {
                 for (Question newQ : questions) {
                     Question existing = existingMap.get(newQ.getTitle());
                     if (existing != null) {
-                        // 만약 기존 데이터의 summary나 explanation이 비어있다면, 새로운 리치 필드들을 업데이트해줍니다.
-                        if (existing.getSummary() == null || existing.getExplanation() == null) {
+                        boolean modified = false;
+                        if (newQ.getCategory() != null && !newQ.getCategory().equals(existing.getCategory())) {
+                            existing.setCategory(newQ.getCategory());
+                            modified = true;
+                        }
+                        if (newQ.getSubject() != null && !newQ.getSubject().equals(existing.getSubject())) {
+                            existing.setSubject(newQ.getSubject());
+                            modified = true;
+                        }
+                        if (newQ.getPerfectAnswer() != null && !newQ.getPerfectAnswer().equals(existing.getPerfectAnswer())) {
+                            existing.setPerfectAnswer(newQ.getPerfectAnswer());
+                            modified = true;
+                        }
+                        if (newQ.getImportance() != null && !newQ.getImportance().equals(existing.getImportance())) {
                             existing.setImportance(newQ.getImportance());
+                            modified = true;
+                        }
+                        if (newQ.getSummary() != null && !newQ.getSummary().equals(existing.getSummary())) {
                             existing.setSummary(newQ.getSummary());
+                            modified = true;
+                        }
+                        if (newQ.getExplanation() != null && !newQ.getExplanation().equals(existing.getExplanation())) {
                             existing.setExplanation(newQ.getExplanation());
+                            modified = true;
+                        }
+                        if (newQ.getCaveats() != null && !newQ.getCaveats().equals(existing.getCaveats())) {
                             existing.setCaveats(newQ.getCaveats());
+                            modified = true;
+                        }
+                        if (newQ.getTailQuestions() != null && !newQ.getTailQuestions().equals(existing.getTailQuestions())) {
                             existing.setTailQuestions(newQ.getTailQuestions());
+                            modified = true;
+                        }
+                        if (newQ.getReferences() != null && !newQ.getReferences().equals(existing.getReferences())) {
                             existing.setReferences(newQ.getReferences());
+                            modified = true;
+                        }
+                        
+                        if (modified) {
                             toSave.add(existing);
                             updateCount++;
                         }
