@@ -21,9 +21,6 @@ public class EmailServiceIntegrationTest {
     @Autowired
     private QuestionRepository questionRepository;
 
-    @Autowired
-    private com.junha.interview.repository.EmailSubscriptionRepository subscriptionRepository;
-
     @Test
     void testSendSampleEmail() throws Exception {
         List<Question> questions = questionRepository.findAll();
@@ -37,16 +34,5 @@ public class EmailServiceIntegrationTest {
 
         // 비동기 실행이므로 잠깐 대기하여 로그 출력을 확인
         Thread.sleep(2000);
-    }
-
-    @Test
-    void testCheckSubscribers() {
-        List<com.junha.interview.domain.EmailSubscription> activeSubs = subscriptionRepository.findAllByActiveTrue();
-        System.out.println("=== ACTIVE SUBSCRIBERS ===");
-        System.out.println("Active subscribers count: " + activeSubs.size());
-        for (var sub : activeSubs) {
-            System.out.println("Sub ID: " + sub.getId() + ", Category: " + sub.getCategory() + ", Encrypted Email Length: " + (sub.getEncryptedEmail() != null ? sub.getEncryptedEmail().length() : 0));
-        }
-        System.out.println("==========================");
     }
 }

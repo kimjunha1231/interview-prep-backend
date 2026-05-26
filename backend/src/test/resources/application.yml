@@ -20,5 +20,5 @@ springdoc:
     path: /api-docs
 
 app:
-  frontend-url: "http://localhost:5173"
+  frontend-url: "https://interview-prep-handbook-1xr5.vercel.app"
   backend-url: "http://localhost:8080"

@@ -29,7 +29,7 @@ public class DailyQuestionScheduler {
      * 데이터베이스 내 무작위 면접 질문 1개를 선정하여 이메일로 자동 전송합니다.
      * cron = "0 0 9 * * ?" (매일 9시 0분 0초)
      */
-    @Scheduled(cron = "${app.scheduler.daily-cron:0 10 9 * * ?}", zone = "Asia/Seoul")
+    @Scheduled(cron = "${app.scheduler.daily-cron:0 0 9 * * ?}", zone = "Asia/Seoul")
     public void sendDailyInterviewQuestion() {
         log.info("Daily Interview Question Scheduler triggered.");
 

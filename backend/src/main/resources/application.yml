@@ -50,7 +50,7 @@ ai:
     api-key: ${GROQ_API_KEY:none}
 
 app:
-  frontend-url: "${FRONTEND_URL:http://localhost:5173}"
+  frontend-url: "${FRONTEND_URL:https://interview-prep-handbook-1xr5.vercel.app}"
   backend-url: "${BACKEND_URL:http://localhost:8080}"
 
 
