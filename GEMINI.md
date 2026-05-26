@@ -173,3 +173,17 @@
     *   이에 따라 텍스트 성격에 맞추어 `text-gray-500 dark:text-apple-body-muted`, `text-amber-600 dark:text-yellow-500`과 같이 명시적으로 분리하여 가독성을 보완해야 합니다.
 *   **공용 컴포넌트의 다이나믹 테마 유연성**:
     *   `Button.tsx` 등의 공용 UI 컴포넌트 variant 중 `dark-utility` 같은 유틸리티 요소도 단일 테마에 하드코딩되지 않고 테마 전환에 유기적으로 연동되도록 반응형 클래스 처리를 거쳐야 합니다.
+
+---
+
+## ⚡ 14. Google Gemini API Key Rotation (3중 다중화)
+
+*   **API Key Rotation을 통한 AI 무중단 서빙**:
+    *   구글 Gemini API의 무료 일일 할당량 소진 또는 순간 트래픽 제한(429 Too Many Requests), API Key 만료/인증 에러(403 Forbidden)가 발생할 때 서비스가 마비되는 것을 막기 위해 API Key 3중 로테이션 체계를 가동합니다.
+*   **환경변수 바인딩**:
+    *   `GEMINI_API_KEY_PRIMARY` (기존 `GEMINI_API_KEY`와 호환 폴백), `GEMINI_API_KEY_SECONDARY`, `GEMINI_API_KEY_TERTIARY` 세 개의 키를 주입받을 수 있도록 `application.yml`에 설정되어 있습니다.
+    *   키 필드가 지정되지 않거나 `none` 값일 경우에는 자동으로 필터링 및 제외되어, 가용한 키 개수에 따라 동적으로 이중화/단일 모드로 폴백 기동됩니다.
+*   **이중 루프 기반의 Key-Model Fallback Chain**:
+    *   `callGeminiApi` 메서드 내부에서 `[API Key 루프] - [MODEL_CHAIN 루프]`의 이중 구조가 실행됩니다.
+    *   특정 API Key로 요청 중 429(할당량 초과) 혹은 403(인증 에러) 에러 발생 시, 무의미하게 하위 모델 체인을 호출하지 않고 즉시 내부 루프를 탈출(`break`)하여 다음 대기 키로 교체 스위칭 후 최상위 모델부터 재요청을 즉시 전개합니다.
+
