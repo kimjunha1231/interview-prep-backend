@@ -45,7 +45,9 @@ springdoc:
 
 ai:
   gemini:
-    api-key: ${GEMINI_API_KEY:none}
+    api-key-primary: ${GEMINI_API_KEY_PRIMARY:${GEMINI_API_KEY:none}}
+    api-key-secondary: ${GEMINI_API_KEY_SECONDARY:none}
+    api-key-tertiary: ${GEMINI_API_KEY_TERTIARY:none}
   groq:
     api-key: ${GROQ_API_KEY:none}
 

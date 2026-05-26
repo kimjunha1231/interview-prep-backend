@@ -21,8 +21,14 @@ import java.util.Map;
 @Slf4j
 public class GeminiService {
 
-    @Value("${ai.gemini.api-key}")
-    private String apiKey;
+    @Value("${ai.gemini.api-key-primary}")
+    private String apiKeyPrimary;
+
+    @Value("${ai.gemini.api-key-secondary}")
+    private String apiKeySecondary;
+
+    @Value("${ai.gemini.api-key-tertiary}")
+    private String apiKeyTertiary;
 
     private final WebClient webClient;
     private final ObjectMapper objectMapper;
@@ -47,80 +53,118 @@ public class GeminiService {
         new ModelConfig("gemini-2.5-pro", false)
     );
 
-    // ─── 공통 유틸: API Key 유효성 검사 ───────────────────────────────
-    private boolean isApiKeyConfigured() {
-        return apiKey != null
-                && !apiKey.equals("none")
-                && !apiKey.trim().isEmpty()
-                && !apiKey.startsWith("your_");
+    // ─── 공통 유틸: 유효한 API Key 리스트 추출 ─────────────────────────
+    private List<String> getAvailableApiKeys() {
+        List<String> keys = new java.util.ArrayList<>();
+        if (isValidKey(apiKeyPrimary)) {
+            keys.add(apiKeyPrimary.trim());
+        }
+        if (isValidKey(apiKeySecondary)) {
+            keys.add(apiKeySecondary.trim());
+        }
+        if (isValidKey(apiKeyTertiary)) {
+            keys.add(apiKeyTertiary.trim());
+        }
+        return keys;
     }
 
-    // ─── 공통 유틸: Gemini API 호출 + Model Fallback Chain ─────────────
+    private boolean isValidKey(String key) {
+        return key != null
+                && !key.equals("none")
+                && !key.trim().isEmpty()
+                && !key.startsWith("your_");
+    }
+
+    // ─── 공통 유틸: API Key 유효성 검사 ───────────────────────────────
+    private boolean isApiKeyConfigured() {
+        return !getAvailableApiKeys().isEmpty();
+    }
+
+    // ─── 공통 유틸: Gemini API 호출 + API Key Rotation + Model Fallback Chain ─────────────
     /**
      * Gemini API에 프롬프트를 전송하고 응답 텍스트를 추출합니다.
-     * MODEL_CHAIN 순서대로 시도하며, 모든 모델이 실패하면 null을 반환합니다.
+     * 활성화된 API Key 리스트를 순회하며 각 Key마다 MODEL_CHAIN을 돌려 성공할 때까지 시도합니다.
+     * 429(할당량 초과) 및 403(권한 오류) 감지 시 즉시 다음 예비 API Key로 우회 전환합니다.
      *
      * @param prompt           전송할 프롬프트 텍스트
      * @param jsonResponseMode true이면 응답 MIME Type을 application/json으로 지정
      * @param operationName    로그 식별용 작업 이름
-     * @return 응답 텍스트 또는 모든 모델 실패 시 null
+     * @return 응답 텍스트 또는 모든 Key/모델 실패 시 null
      */
     private String callGeminiApi(String prompt, boolean jsonResponseMode, String operationName) {
         WebClient client = webClient.mutate()
                 .baseUrl("https://generativelanguage.googleapis.com").build();
 
-        for (ModelConfig config : MODEL_CHAIN) {
-            try {
-                log.info("Attempting {} using model: {}", operationName, config.getName());
+        List<String> activeKeys = getAvailableApiKeys();
+        if (activeKeys.isEmpty()) {
+            log.warn("No configured Gemini API keys available for {}", operationName);
+            return null;
+        }
 
-                Map<String, Object> requestBody;
-                if (jsonResponseMode) {
-                    requestBody = Map.of(
-                        "contents", List.of(
-                            Map.of("parts", List.of(Map.of("text", prompt)))
-                        ),
-                        "generationConfig", Map.of(
-                            "responseMimeType", "application/json"
-                        )
-                    );
-                } else {
-                    requestBody = Map.of(
-                        "contents", List.of(
-                            Map.of("parts", List.of(Map.of("text", prompt)))
-                        )
-                    );
+        for (int keyIdx = 0; keyIdx < activeKeys.size(); keyIdx++) {
+            String activeKey = activeKeys.get(keyIdx);
+            log.info("Starting {} attempt with API Key index: {}/{}", operationName, keyIdx + 1, activeKeys.size());
+
+            for (ModelConfig config : MODEL_CHAIN) {
+                try {
+                    log.info("Attempting {} using model: {} on API Key index: {}", operationName, config.getName(), keyIdx + 1);
+
+                    Map<String, Object> requestBody;
+                    if (jsonResponseMode) {
+                        requestBody = Map.of(
+                            "contents", List.of(
+                                Map.of("parts", List.of(Map.of("text", prompt)))
+                            ),
+                            "generationConfig", Map.of(
+                                "responseMimeType", "application/json"
+                            )
+                        );
+                    } else {
+                        requestBody = Map.of(
+                            "contents", List.of(
+                                Map.of("parts", List.of(Map.of("text", prompt)))
+                            )
+                        );
+                    }
+
+                    String responseJson = client.post()
+                        .uri(uriBuilder -> uriBuilder
+                            .path("/v1beta/models/" + config.getName() + ":generateContent")
+                            .build())
+                        .header("x-goog-api-key", activeKey)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .bodyValue(requestBody)
+                        .retrieve()
+                        .bodyToMono(String.class)
+                        .block();
+
+                    Map<String, Object> responseMap = objectMapper.readValue(responseJson, Map.class);
+                    List<Map<String, Object>> candidates = (List<Map<String, Object>>) responseMap.get("candidates");
+                    Map<String, Object> content = (Map<String, Object>) candidates.get(0).get("content");
+                    List<Map<String, Object>> parts = (List<Map<String, Object>>) content.get("parts");
+                    String textResult = (String) parts.get(0).get("text");
+
+                    log.info("Successfully completed {} using model: {} with API Key index: {}", operationName, config.getName(), keyIdx + 1);
+                    return textResult;
+
+                } catch (WebClientResponseException e) {
+                    log.warn("Failed {} with model: {} on API Key index: {} due to HTTP status: {}",
+                             operationName, config.getName(), keyIdx + 1, e.getStatusCode());
+
+                    // 429(할당량 소진) 또는 403(인증 실패) 발생 시, 다음 모델을 돌기보다 바로 예비 API Key로 스위칭합니다.
+                    if (e.getStatusCode().value() == 429 || e.getStatusCode().value() == 403) {
+                        log.warn("API Key index {} returned quota/auth error ({}). Breaking model chain to switch API Key...",
+                                 keyIdx + 1, e.getStatusCode());
+                        break; // 내부 모델 루프 탈출 -> 다음 API Key 루프로 전이
+                    }
+                } catch (Exception e) {
+                    log.warn("Failed {} with model: {} on API Key index: {} due to unexpected error. Retrying next model...",
+                             operationName, config.getName(), keyIdx + 1, e);
                 }
-
-                String responseJson = client.post()
-                    .uri(uriBuilder -> uriBuilder
-                        .path("/v1beta/models/" + config.getName() + ":generateContent")
-                        .build())
-                    .header("x-goog-api-key", apiKey)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .bodyValue(requestBody)
-                    .retrieve()
-                    .bodyToMono(String.class)
-                    .block();
-
-                Map<String, Object> responseMap = objectMapper.readValue(responseJson, Map.class);
-                List<Map<String, Object>> candidates = (List<Map<String, Object>>) responseMap.get("candidates");
-                Map<String, Object> content = (Map<String, Object>) candidates.get(0).get("content");
-                List<Map<String, Object>> parts = (List<Map<String, Object>>) content.get("parts");
-                String textResult = (String) parts.get(0).get("text");
-
-                log.info("Successfully completed {} using model: {}", operationName, config.getName());
-                return textResult;
-
-            } catch (WebClientResponseException e) {
-                log.warn("Failed {} with model: {} due to HTTP status: {}. Retrying with next model...",
-                         operationName, config.getName(), e.getStatusCode());
-            } catch (Exception e) {
-                log.warn("Failed {} with model: {} due to unexpected error. Retrying with next model...",
-                         operationName, config.getName(), e);
             }
         }
 
-        log.error("All models in the fallback chain failed for {}.", operationName);
+        log.error("All models and API keys in the fallback chain failed for {}.", operationName);
         return null;
     }
 

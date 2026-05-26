@@ -25,4 +25,24 @@ class GeminiServiceTest {
         assertThat(evaluation.getFeedback()).contains("What is closure?");
         assertThat(evaluation.getTailQuestion()).isNotEmpty();
     }
+
+    @Test
+    @DisplayName("유효한 API 키 리스트 추출 검증 (1차, 2차, 3차 키 필터링 및 순서)")
+    void testGetAvailableApiKeys() {
+        ObjectMapper objectMapper = new ObjectMapper();
+        WebClient webClient = WebClient.builder().build();
+        GeminiService geminiService = new GeminiService(webClient, objectMapper);
+
+        org.springframework.test.util.ReflectionTestUtils.setField(geminiService, "apiKeyPrimary", "key1");
+        org.springframework.test.util.ReflectionTestUtils.setField(geminiService, "apiKeySecondary", "none");
+        org.springframework.test.util.ReflectionTestUtils.setField(geminiService, "apiKeyTertiary", "  key3 ");
+
+        // reflection으로 private 메서드 getAvailableApiKeys 호출
+        @SuppressWarnings("unchecked")
+        java.util.List<String> keys = (java.util.List<String>) org.springframework.test.util.ReflectionTestUtils.invokeMethod(
+                geminiService, "getAvailableApiKeys"
+        );
+
+        assertThat(keys).containsExactly("key1", "key3");
+    }
 }
