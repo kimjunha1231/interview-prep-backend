@@ -262,7 +262,7 @@ public class EmailService {
         
         String token = encryptionUtils.hash(toEmail);
         sb.append("    <div class='cta-button-wrapper'>");
-        sb.append("      <a href='" + frontendUrl + "/handbook?questionId=" + question.getId() + "' class='cta-button' target='_blank'>정답 및 상세 해설 보기</a>");
+        sb.append("      <a href='" + frontendUrl + "/?questionId=" + question.getId() + "' class='cta-button' target='_blank'>정답 및 상세 해설 보기</a>");
         sb.append("    </div>");
         sb.append("  </div>");
         sb.append("  <div class='footer'>");
