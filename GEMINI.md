@@ -160,3 +160,16 @@
     *   각 탭의 subject key(예: `JAVASCRIPT`, `REACT`)를 쿼리 키 `["questions", selectedSubjectKey]` 형태로 매핑하여, 각 탭 단위의 데이터 병합 및 가공 로직이 queryFn 내에서 격리 수행되도록 단순화했습니다.
 *   **React 19 호환성**:
     *   Vite 빌드 파이프라인에서 React 19와 리액트 쿼리 v5 간의 Peer Dependency 정합성을 검증 완료하였으며, 컴포넌트 렌더링 생명 주기가 완전히 리액트 쿼리에 의해 안전하게 제어되고 있습니다.
+
+---
+
+## 🎨 13. 화이트 모드 및 반응형 UI 디자인 가이드
+
+*   **반응형 테마 지원**:
+    *   화이트 모드(라이트 모드)와 다크 모드에 모두 대응하기 위해 배경색 및 보더선 색상은 명시적 다크/라이트 CSS 클래스를 통해 바인딩되어야 합니다.
+    *   예: `bg-apple-canvas-parchment dark:bg-apple-surface-black border-black/10 dark:border-white/10`
+*   **텍스트 대비 및 가독성 (a11y)**:
+    *   화이트 모드의 흰 배경에서 `#cccccc` (기존 `text-apple-body-muted`)과 같은 흐릿한 회색 계열이나 노란색 경고 문구는 명도 대비 부족으로 가독성이 심각하게 저하됩니다.
+    *   이에 따라 텍스트 성격에 맞추어 `text-gray-500 dark:text-apple-body-muted`, `text-amber-600 dark:text-yellow-500`과 같이 명시적으로 분리하여 가독성을 보완해야 합니다.
+*   **공용 컴포넌트의 다이나믹 테마 유연성**:
+    *   `Button.tsx` 등의 공용 UI 컴포넌트 variant 중 `dark-utility` 같은 유틸리티 요소도 단일 테마에 하드코딩되지 않고 테마 전환에 유기적으로 연동되도록 반응형 클래스 처리를 거쳐야 합니다.
