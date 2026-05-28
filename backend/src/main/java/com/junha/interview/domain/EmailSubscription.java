@@ -25,7 +25,7 @@ public class EmailSubscription {
     @Column(name = "encrypted_email", nullable = false, length = 500)
     private String encryptedEmail;
 
-    @Column(nullable = false, length = 50)
+    @Column(nullable = false, length = 255)
     private String category = "ALL";
 
     @Column(nullable = false)

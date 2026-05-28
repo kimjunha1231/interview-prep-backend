@@ -41,16 +41,23 @@ public class SubscriptionService {
             throw new IllegalArgumentException("올바른 이메일 형식이 아닙니다.");
         }
 
-        // 카테고리 정규화
+        // 카테고리 정규화 (콤마 구분 다중 카테고리 지원)
         String dbCategory = "ALL";
-        if (category != null) {
+        if (category != null && !category.trim().isEmpty()) {
             String temp = category.trim().toUpperCase();
-            if ("FE".equals(temp) || "FRONTEND".equals(temp)) {
-                dbCategory = "Frontend";
-            } else if ("BE".equals(temp) || "BACKEND".equals(temp)) {
-                dbCategory = "Backend";
-            } else if ("CS".equals(temp)) {
-                dbCategory = "CS";
+            if ("ALL".equals(temp)) {
+                dbCategory = "ALL";
+            } else {
+                dbCategory = java.util.Arrays.stream(temp.split(","))
+                        .map(String::trim)
+                        .filter(s -> !s.isEmpty())
+                        .collect(java.util.stream.Collectors.joining(","));
+                
+                if (dbCategory.isEmpty()) {
+                    dbCategory = "ALL";
+                } else if (dbCategory.length() > 255) {
+                    dbCategory = dbCategory.substring(0, 255);
+                }
             }
         }
 

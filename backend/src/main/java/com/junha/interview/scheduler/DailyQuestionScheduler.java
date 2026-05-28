@@ -49,11 +49,7 @@ public class DailyQuestionScheduler {
             return;
         }
 
-        // 카테고리별 질문 분류 (In-memory Grouping)
-        Map<String, List<Question>> questionsByCategory = allQuestions.stream()
-                .collect(Collectors.groupingBy(Question::getCategory));
-
-        log.info("Loaded {} total questions. Categories found: {}.", allQuestions.size(), questionsByCategory.keySet());
+        log.info("Loaded {} total questions for daily challenge distribution.", allQuestions.size());
 
         for (EmailSubscription sub : subscribers) {
             String decryptedEmail = "unknown";
@@ -64,9 +60,21 @@ public class DailyQuestionScheduler {
                 if (targetCat == null || "ALL".equalsIgnoreCase(targetCat) || targetCat.trim().isEmpty()) {
                     candidates = allQuestions;
                 } else {
-                    candidates = questionsByCategory.get(targetCat);
+                    List<String> targetSubjects = java.util.Arrays.stream(targetCat.split(","))
+                            .map(String::trim)
+                            .map(String::toUpperCase)
+                            .filter(s -> !s.isEmpty())
+                            .collect(Collectors.toList());
+
+                    if (targetSubjects.contains("ALL") || targetSubjects.isEmpty()) {
+                        candidates = allQuestions;
+                    } else {
+                        candidates = allQuestions.stream()
+                                .filter(q -> q.getSubject() != null && targetSubjects.contains(q.getSubject().trim().toUpperCase()))
+                                .collect(Collectors.toList());
+                    }
                 }
- 
+
                 if (candidates == null || candidates.isEmpty()) {
                     log.warn("No questions found for category '{}' requested by {}. Falling back to all questions.", targetCat, EmailMaskUtils.mask(decryptedEmail));
                     candidates = allQuestions;
