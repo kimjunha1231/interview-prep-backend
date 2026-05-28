@@ -34,22 +34,49 @@ public class DataInitializer implements CommandLineRunner {
     @Override
     public void run(String... args) throws Exception {
         try {
-            log.info("Executing DDL to ensure question.title is TEXT type...");
-            jdbcTemplate.execute("ALTER TABLE question ALTER COLUMN title TYPE TEXT");
-            log.info("Successfully ensured question.title is TEXT type.");
 
+            // Fix legacy 'cs' subject values to correct specific subjects
             try {
-                log.info("Correcting polluted titles in DB prior to synchronization...");
-                jdbcTemplate.execute("UPDATE question SET title = '최종적 일관성(Eventual Consistency)' WHERE title = 'Generate the representative question' OR title = '{title}'");
-                jdbcTemplate.execute("UPDATE question SET title = '유닛 테스트의 정의와 목적' WHERE title = 'cs_cs_432' OR title = '유닛 테스트'");
-                jdbcTemplate.execute("UPDATE question SET title = 'var 키워드는 뭔가요?' WHERE title = 'fe_javascript_301'");
-                jdbcTemplate.execute("UPDATE question SET title = '자바스크립트의 Truthy와 Falsy 개념' WHERE title = 'fe_javascript_310'");
-                jdbcTemplate.execute("UPDATE question SET title = '자바스크립트 프로미스(Promise)의 개념과 동작 원리' WHERE title = 'fe_javascript_366'");
-                jdbcTemplate.execute("UPDATE question SET title = '전역 상태 관리 라이브러리의 필요성과 동작 원리' WHERE title = 'fe_react_059'");
-                jdbcTemplate.execute("UPDATE question SET title = 'DOM에서 Node와 Element의 차이점' WHERE title = 'fe_react_060'");
-                log.info("Successfully corrected polluted titles in DB.");
+                log.info("Correcting legacy 'cs' subject values to specific subjects...");
+                int devopsUpdated = jdbcTemplate.update(
+                    "UPDATE question SET subject = 'devops' WHERE subject = 'cs' AND title IN (" +
+                    "'Docker와 컨테이너화의 개념', 'CI/CD 파이프라인의 개념', 'Kubernetes 오케스트레이션', " +
+                    "'인프라 코드(Infrastructure as Code)', 'GitOps 배포 전략', " +
+                    "'블루-그린 배포(Blue-Green Deployment)', '카나리 배포(Canary Deployment)')"
+                );
+                int systemDesignUpdated = jdbcTemplate.update(
+                    "UPDATE question SET subject = 'system_design' WHERE subject = 'cs' AND title IN (" +
+                    "'마이크로서비스 아키텍처(MSA)란?', 'API 게이트웨이의 역할', '서비스 메시(Service Mesh)의 개념', " +
+                    "'이벤트 드리븐 아키텍처(EDA)란?', '메시지 큐(Message Queue)의 동작 원리', " +
+                    "'CQRS 패턴이란?', '사가(Saga) 패턴', '분산 트랜잭션 처리', " +
+                    "'서킷 브레이커(Circuit Breaker) 패턴', '최종적 일관성(Eventual Consistency)', " +
+                    "'CAP 정리(CAP Theorem)', '샤딩(Sharding)과 파티셔닝', " +
+                    "'로드 밸런서의 종류와 알고리즘', 'CDN(Content Delivery Network)의 동작 원리', " +
+                    "'WebSocket과 HTTP Polling의 차이')"
+                );
+                int softwareEngUpdated = jdbcTemplate.update(
+                    "UPDATE question SET subject = 'software_engineering' WHERE subject = 'cs' AND title IN (" +
+                    "'객체지향 프로그래밍(OOP)의 4대 원칙', 'SOLID 원칙이란?', " +
+                    "'디자인 패턴의 개념과 분류', '싱글톤 패턴(Singleton Pattern)', " +
+                    "'팩토리 패턴(Factory Pattern)', '전략 패턴(Strategy Pattern)', " +
+                    "'옵저버 패턴(Observer Pattern)', '의존성 주입(Dependency Injection)', " +
+                    "'테스트 주도 개발(TDD)이란?', '유닛 테스트의 정의와 목적', " +
+                    "'RESTful API 설계 원칙', 'GraphQL vs REST API', " +
+                    "'클린 코드의 원칙', '리팩토링이란?', " +
+                    "'애자일(Agile) 방법론', 'Git 브랜치 전략', " +
+                    "'코드 리뷰의 목적과 best practices', '기술 부채(Technical Debt)', " +
+                    "'소프트웨어 아키텍처 패턴', 'DDD(도메인 주도 설계)', " +
+                    "'함수형 프로그래밍의 특징', '동시성과 병렬성의 차이', " +
+                    "'메모리 관리와 가비지 컬렉션', '시간 복잡도와 공간 복잡도')"
+                );
+                // Any remaining 'cs' subjects that don't match specific titles → software_engineering
+                int remainingUpdated = jdbcTemplate.update(
+                    "UPDATE question SET subject = 'software_engineering' WHERE subject = 'cs'"
+                );
+                log.info("Subject correction complete: devops={}, system_design={}, software_engineering={}, remaining->software_engineering={}",
+                    devopsUpdated, systemDesignUpdated, softwareEngUpdated, remainingUpdated);
             } catch (Exception e) {
-                log.warn("Could not correct polluted titles (they might have been corrected already, or table doesn't exist yet): {}", e.getMessage());
+                log.warn("Could not correct legacy 'cs' subjects: {}", e.getMessage());
             }
         } catch (Exception e) {
             log.warn("Could not alter question.title to TEXT (it might already be TEXT, or table doesn't exist yet): {}", e.getMessage());
