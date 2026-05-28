@@ -22,3 +22,11 @@ springdoc:
 app:
   frontend-url: "https://interview-prep-handbook-1xr5.vercel.app"
   backend-url: "http://localhost:8080"
+
+ai:
+  gemini:
+    api-key-primary: none
+    api-key-secondary: none
+    api-key-tertiary: none
+  groq:
+    api-key: none

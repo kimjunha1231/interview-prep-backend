@@ -1,6 +1,7 @@
 package com.junha.interview.service;
 
 import com.junha.interview.domain.Question;
+import com.junha.interview.dto.QuestionSummaryDto;
 import com.junha.interview.repository.QuestionRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -58,5 +59,24 @@ public class QuestionServiceTest {
 
         // Then
         verify(questionRepository).findRandomQuestions(null, null, 5);
+    }
+
+    @Test
+    @DisplayName("getQuestionSummaries API 요청 시 질문 목록을 Summary Dto 형태로 매핑하여 반환한다")
+    void testGetQuestionSummaries() {
+        // Given
+        Question question = new Question(1L, "Frontend", "JavaScript", "What is closure?", "Closure is...");
+        when(questionRepository.findQuestionsActive("Frontend", "JavaScript"))
+                .thenReturn(List.of(question));
+
+        // When
+        List<QuestionSummaryDto> summaries = questionService.getQuestionSummaries("Frontend", "JavaScript");
+
+        // Then
+        assertThat(summaries).hasSize(1);
+        assertThat(summaries.get(0).getId()).isEqualTo(1L);
+        assertThat(summaries.get(0).getCategory()).isEqualTo("Frontend");
+        assertThat(summaries.get(0).getSubject()).isEqualTo("JavaScript");
+        assertThat(summaries.get(0).getTitle()).isEqualTo("What is closure?");
     }
 }

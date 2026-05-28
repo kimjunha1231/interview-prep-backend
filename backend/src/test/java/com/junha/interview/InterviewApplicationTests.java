@@ -1,6 +1,7 @@
 package com.junha.interview;
 
 import com.jayway.jsonpath.JsonPath;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -10,6 +11,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -17,11 +19,18 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureWebTestClient
-@ActiveProfiles("local")
+@ActiveProfiles("test")
 class InterviewApplicationTests {
 
 	@Autowired
 	private WebTestClient webTestClient;
+
+	@BeforeEach
+	void setUp() {
+		this.webTestClient = this.webTestClient.mutate()
+				.responseTimeout(Duration.ofSeconds(30))
+				.build();
+	}
 
 	@Value("${springdoc.api-docs.path}")
 	private String apiDocsPath;

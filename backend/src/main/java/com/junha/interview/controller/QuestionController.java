@@ -2,6 +2,7 @@ package com.junha.interview.controller;
 
 import com.junha.interview.common.ApiResponse;
 import com.junha.interview.domain.Question;
+import com.junha.interview.dto.QuestionSummaryDto;
 import com.junha.interview.service.QuestionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -27,6 +28,15 @@ public class QuestionController {
     ) {
         List<Question> questions = questionService.getRandomQuestions(category, subject, count);
         return ApiResponse.success(questions);
+    }
+
+    @GetMapping("/list")
+    public ApiResponse<List<QuestionSummaryDto>> getQuestionSummaries(
+            @RequestParam(value = "category", required = false) String category,
+            @RequestParam(value = "subject", required = false) String subject
+    ) {
+        List<QuestionSummaryDto> summaries = questionService.getQuestionSummaries(category, subject);
+        return ApiResponse.success(summaries);
     }
 
     @GetMapping

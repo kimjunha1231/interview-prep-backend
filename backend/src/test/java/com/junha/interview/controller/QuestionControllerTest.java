@@ -1,6 +1,7 @@
 package com.junha.interview.controller;
 
 import com.junha.interview.domain.Question;
+import com.junha.interview.dto.QuestionSummaryDto;
 import com.junha.interview.service.QuestionService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -67,6 +68,30 @@ public class QuestionControllerTest {
                 .andExpect(jsonPath("$.data.subject").value("JavaScript"))
                 .andExpect(jsonPath("$.data.title").value("What is closure?"))
                 .andExpect(jsonPath("$.data.perfectAnswer").value("Closure is..."))
+                .andExpect(jsonPath("$.error").isEmpty());
+    }
+
+    @Test
+    @DisplayName("GET /api/questions/list API 요청 시 질문 요약 정보 목록을 반환한다")
+    void testGetQuestionSummariesApi() throws Exception {
+        // Given
+        Question question = new Question(1L, "Frontend", "JavaScript", "What is closure?", "Closure is...");
+        QuestionSummaryDto summary = new QuestionSummaryDto(question);
+        given(questionService.getQuestionSummaries("Frontend", "JavaScript"))
+                .willReturn(List.of(summary));
+
+        // When & Then
+        mockMvc.perform(get("/api/questions/list")
+                        .param("category", "Frontend")
+                        .param("subject", "JavaScript")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data[0].id").value(1))
+                .andExpect(jsonPath("$.data[0].category").value("Frontend"))
+                .andExpect(jsonPath("$.data[0].subject").value("JavaScript"))
+                .andExpect(jsonPath("$.data[0].title").value("What is closure?"))
+                .andExpect(jsonPath("$.data[0].perfectAnswer").doesNotExist())
                 .andExpect(jsonPath("$.error").isEmpty());
     }
 }

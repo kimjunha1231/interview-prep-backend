@@ -1,4 +1,12 @@
+server:
+  compression:
+    enabled: true
+    mime-types: application/json,application/javascript,text/html,text/plain
+    min-response-size: 1024 # 1KB 이상 응답만 압축
+
 spring:
+  cache:
+    type: simple # JVM 인메모리 캐시 (Caffeine 없이 기본 ConcurrentHashMap)
   profiles:
     active: local # 기본 활성화할 프로파일을 local로 지정
   servlet:

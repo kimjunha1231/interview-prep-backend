@@ -1,12 +1,15 @@
 package com.junha.interview.service;
 
 import com.junha.interview.domain.Question;
+import com.junha.interview.dto.QuestionSummaryDto;
 import com.junha.interview.repository.QuestionRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -26,12 +29,21 @@ public class QuestionService {
         return questionRepository.findRandomQuestions(categoryParam, subjectParam, limit);
     }
 
+    @Cacheable(value = "questions", key = "#category + '_' + #subject")
     public List<Question> getQuestions(String category, String subject) {
         String categoryParam = (category == null || category.trim().isEmpty()) ? null : category.trim();
         String subjectParam = (subject == null || subject.trim().isEmpty()) ? null : subject.trim();
         return questionRepository.findQuestionsActive(categoryParam, subjectParam);
     }
 
+    @Cacheable(value = "questionSummaries", key = "#category + '_' + #subject")
+    public List<QuestionSummaryDto> getQuestionSummaries(String category, String subject) {
+        return getQuestions(category, subject).stream()
+                .map(QuestionSummaryDto::new)
+                .collect(Collectors.toList());
+    }
+
+    @Cacheable(value = "questionDetail", key = "#id")
     public Question getQuestionById(Long id) {
         return questionRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Question not found with id: " + id));
