@@ -208,12 +208,16 @@
 *   **2-Phase Loading 설계**:
     *   개념 학습 핸드북 탭 진입 시 443개 질문의 대용량 데이터(상세 설명, 모범 답안, 주의사항, 참고 링크 포함 약 2.5MB)를 단일 API 호출로 조회하는 대신, 목록 표시에 필수적인 식별 정보(`id`, `category`, `subject`, `title`, `summary`, `importance`)만 포함하는 경량 DTO `QuestionSummaryDto` 및 API `/api/questions/list`(~100KB)를 사용하여 초기 목록을 200ms대 내로 렌더링하도록 1차 로드 성능을 개선했습니다.
     *   상세 설명이 포함된 데이터는 백그라운드 캐싱 루프(`["questions", "ALL_FULL"]`)를 돌려 캐싱하고, 사용자가 질문 목록에서 클릭하는 순간에 백그라운드 패치가 완료되지 않은 상태라면 해당 질문의 상세 내용만 개별 API `/api/questions/{id}`를 통해 지연 조회(On-demand Fetching)하도록 설계했습니다.
+*   **클라이언트 캐시 시딩 및 메모리 동기식 룩업**:
+    *   **Cache Seeding**: 백그라운드 캐시 루프에서 443개 질문 전체를 조회 완료(`allQuestions`)하면, TanStack Query 캐시 관리자에 각각의 개별 상세 질문 데이터를 `queryClient.setQueryData(["questionDetail", q.id], q)`로 동적 자가 분할 주입(Seeding)합니다.
+    *   **Sync Lookup**: 질문 상세 렌더링 시, React 컴포넌트 생명주기 내부에서 이미 preloaded된 `allQuestions` 배열에서 클릭한 질문을 동기식으로 일치 탐색(`find`)하도록 Fallback Chain을 구성했습니다. 이를 통해 백그라운드 전송이 완료된 상태에서는 네트워크 API 요청을 전면 차단하고 **완벽한 0ms 반응 렌더링**을 실현했습니다.
 *   **서버/클라이언트 다층 캐싱**:
     *   **Server Cache**: 백엔드 `QuestionService`에 스프링 `@Cacheable` 어노테이션을 설정하여 동일 쿼리 파라미터 조합 및 ID 조회 시 데이터베이스(Supabase) I/O 통신을 차단하고 즉시 메모리 캐시 데이터를 반환하도록 구현했습니다.
     *   **Client Cache**: TanStack Query (React Query)를 이용해 목록 및 질문 상세 정보를 `staleTime: Infinity`로 지정해, 로컬 내에서 탭 이동 및 클릭 시 API 중복 호출을 원천 배제하여 0ms 렌더링을 가능하게 했습니다.
 *   **Gzip 압축 및 스켈레톤 로더(a11y)**:
     *   `application.yml`의 `server.compression` 설정을 활성화하여 1KB 이상 json/javascript 응답을 Gzip 압축 전송(데이터 전송 크기 약 80% 감소)하게 유도했습니다.
     *   상세 데이터를 On-demand로 지연 조회하는 도중 사용자 경험 향상을 위해, 차분한 모노톤의 `Skeleton` 컴포넌트를 `animate-pulse` 모드로 구성하여 로딩 중임을 시각적 및 보조기기(`aria-busy="true"`, `aria-live="polite"`)에 안전하게 전파하도록 설계했습니다.
+
 
 
 

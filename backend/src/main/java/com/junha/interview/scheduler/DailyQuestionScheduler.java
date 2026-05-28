@@ -70,7 +70,10 @@ public class DailyQuestionScheduler {
                         candidates = allQuestions;
                     } else {
                         candidates = allQuestions.stream()
-                                .filter(q -> q.getSubject() != null && targetSubjects.contains(q.getSubject().trim().toUpperCase()))
+                                .filter(q -> 
+                                    (q.getSubject() != null && targetSubjects.contains(q.getSubject().trim().toUpperCase())) ||
+                                    (q.getCategory() != null && targetSubjects.contains(q.getCategory().trim().toUpperCase()))
+                                )
                                 .collect(Collectors.toList());
                     }
                 }
